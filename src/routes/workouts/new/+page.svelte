@@ -2,7 +2,7 @@
   import { db } from '$lib/db';
   import { generateId } from '$lib';
   import { goto } from '$app/navigation';
-  import { base } from '$app/paths';
+    import { base } from '$app/paths';
   import { onMount } from 'svelte';
   import { supabase } from '$lib/supabaseClient';
 

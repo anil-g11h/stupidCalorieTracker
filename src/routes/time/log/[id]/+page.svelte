@@ -2,7 +2,7 @@
   import { db } from '$lib/db';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
-  import { base } from '$app/paths';
+    import { base } from '$app/paths';
   import { liveQuery } from 'dexie';
   import { onMount } from 'svelte';
   import { format, parseISO } from 'date-fns';

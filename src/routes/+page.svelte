@@ -2,6 +2,7 @@
 	import { db, type DailyLog, type Food } from '$lib/db';
 	import { liveQueryStore } from '$lib/stores/liveQuery';
 	import { Plus, Utensils, ChevronLeft, ChevronRight, Calendar } from 'lucide-svelte';
+	import { base } from '$app/paths';
 
 	// State for Date Navigation
 	let currentDate = new Date();

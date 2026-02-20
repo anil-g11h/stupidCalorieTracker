@@ -6,6 +6,7 @@
   let searchQuery = '';
   
   // Create a live query for foods
+    import { base } from '$app/paths';
   let foods = liveQuery(() => db.foods.toArray());
 
   // Filtered foods based on search query

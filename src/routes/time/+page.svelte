@@ -5,6 +5,7 @@
   import { goto } from '$app/navigation';
   import { generateId } from '$lib';
   import { onMount } from 'svelte';
+  import { base } from '$app/paths';
 
   // State
   let date = $state(new Date());

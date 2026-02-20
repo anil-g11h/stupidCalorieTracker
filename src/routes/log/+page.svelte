@@ -5,6 +5,7 @@
   import { goto } from '$app/navigation';
   import { onMount, onDestroy } from 'svelte';
   import { Utensils, ChevronLeft, ChevronRight, Calendar } from 'lucide-svelte';
+   import { base } from '$app/paths';
 
   // Date State
   let date = $page.url.searchParams.get('date') || new Date().toISOString().split('T')[0];
