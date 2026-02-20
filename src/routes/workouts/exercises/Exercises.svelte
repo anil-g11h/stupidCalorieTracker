@@ -1,4 +1,17 @@
 <script lang="ts">
+    // Ensure /# is present in the URL on page load for SPA hash routing
+    if (typeof window !== 'undefined') {
+      const expectedPrefix = `/${BASE_URL}/#`;
+      const { pathname, hash } = window.location;
+      if (!pathname.startsWith(`/${BASE_URL}`) || !hash) {
+        // If not already at /BASE_URL/#, redirect to it, preserving any hash/query
+        const afterBase = pathname.replace(`/${BASE_URL}`, '');
+        const newUrl = `/${BASE_URL}/#${afterBase}${window.location.search || ''}`;
+        if (window.location.pathname !== `/${BASE_URL}/` || !window.location.hash) {
+          window.location.replace(newUrl);
+        }
+      }
+    }
   import { db, type WorkoutExerciseDef } from '$lib/db';
   import { liveQuery } from 'dexie';
   import { generateId } from '../../../lib';
