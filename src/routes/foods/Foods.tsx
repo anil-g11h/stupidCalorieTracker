@@ -1,24 +1,86 @@
 import React, { useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Link } from 'react-router-dom';
-import { db } from '../../lib/db';
+import { db, type Food } from '../../lib/db';
+import { analyzeEaaRatio, scoreFoodForEaaDeficit, type EaaRatioGroupKey } from '../../lib/eaa';
 
 export default function FoodList() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortMode, setSortMode] = useState<'default' | 'eaa-gap'>('default');
+  const today = new Date().toISOString().split('T')[0];
 
   // Subscribe to the foods table
   const foods = useLiveQuery(() => db.foods.toArray());
+  const dayNutritionContext = useLiveQuery(async () => {
+    const dayLogs = await db.logs.where('date').equals(today).toArray();
+    const dayFoodIds = [...new Set(dayLogs.map((log) => log.food_id))];
+    const dayFoods = dayFoodIds.length ? await db.foods.where('id').anyOf(dayFoodIds).toArray() : [];
+    const dayFoodsMap = dayFoods.reduce<Record<string, Food>>((acc, food) => {
+      acc[food.id] = food;
+      return acc;
+    }, {});
+
+    return { dayLogs, dayFoodsMap };
+  }, [today]);
+
+  const eaaDeficit = useMemo(() => {
+    if (!dayNutritionContext) {
+      return {
+        leucine: 0,
+        lysine: 0,
+        valineIsoleucine: 0,
+        rest: 0
+      };
+    }
+
+    return analyzeEaaRatio(
+      dayNutritionContext.dayLogs.map((log) => {
+        const food = dayNutritionContext.dayFoodsMap[log.food_id];
+        return {
+          proteinGrams: Number(food?.protein) || 0,
+          amountConsumed: Number(log.amount_consumed) || 0,
+          micros: food?.micros
+        };
+      })
+    ).deficitByGroup;
+  }, [dayNutritionContext]);
 
   // Reactive filtering using useMemo
-  const filteredFoods = useMemo(() => {
+  const rankedFoods = useMemo(() => {
     if (!foods) return [];
     
     const query = searchQuery.toLowerCase();
-    return foods.filter(food => 
+    const filtered = foods.filter(food => 
       food.name.toLowerCase().includes(query) ||
       (food.brand && food.brand.toLowerCase().includes(query))
     );
-  }, [foods, searchQuery]);
+
+    if (sortMode === 'default') {
+      return filtered.map((food) => ({
+        food,
+        score: 0,
+        bestGroup: null as EaaRatioGroupKey | null
+      }));
+    }
+
+    return [...filtered]
+      .map((food) => {
+        const scoreData = scoreFoodForEaaDeficit(food.micros, eaaDeficit, 1);
+        const rankedGroups = (Object.keys(scoreData.filledByGroup) as EaaRatioGroupKey[])
+          .map((group) => ({ group, value: scoreData.filledByGroup[group] }))
+          .sort((a, b) => b.value - a.value);
+
+        return {
+          food,
+          score: scoreData.score,
+          bestGroup: rankedGroups[0]?.value > 0 ? rankedGroups[0].group : null
+        };
+      })
+      .sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        return b.food.protein - a.food.protein;
+      });
+  }, [foods, searchQuery, sortMode, eaaDeficit]);
 
   return (
     <div className="container mx-auto p-4">
@@ -52,14 +114,34 @@ export default function FoodList() {
         />
       </div>
 
+      <div className="mb-4 flex items-center justify-between">
+        <p className="text-xs text-text-muted">Sort by today&apos;s missing EAA groups</p>
+        <div className="rounded-lg border border-border-subtle bg-surface p-1 flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setSortMode('default')}
+            className={`px-2.5 py-1 text-xs font-bold rounded-md transition-colors ${sortMode === 'default' ? 'bg-brand text-brand-fg' : 'text-text-muted hover:text-text-main'}`}
+          >
+            Default
+          </button>
+          <button
+            type="button"
+            onClick={() => setSortMode('eaa-gap')}
+            className={`px-2.5 py-1 text-xs font-bold rounded-md transition-colors ${sortMode === 'eaa-gap' ? 'bg-brand text-brand-fg' : 'text-text-muted hover:text-text-main'}`}
+          >
+            EAA Gap
+          </button>
+        </div>
+      </div>
+
       {/* List Content */}
       {!foods ? (
         <p className="text-text-muted">Loading...</p>
-      ) : filteredFoods.length === 0 ? (
+      ) : rankedFoods.length === 0 ? (
         <p className="text-text-muted">No foods found.</p>
       ) : (
         <div className="grid gap-4">
-          {filteredFoods.map((food) => (
+          {rankedFoods.map(({ food, score, bestGroup }) => (
             <Link
               key={food.id}
               to={`/foods/${food.id}`}
@@ -79,6 +161,13 @@ export default function FoodList() {
                   <span className="mx-1">/</span>
                   <span>F: {food.fat}g</span>
                 </div>
+                {sortMode === 'eaa-gap' && (
+                  <div className="text-xs text-text-muted mt-1">
+                    {score > 0
+                      ? `EAA fit +${(Math.round(score * 100) / 100).toFixed(2)}g${bestGroup ? ` (${bestGroup})` : ''}`
+                      : 'No EAA gap contribution'}
+                  </div>
+                )}
               </div>
               
               <div className="flex items-center space-x-2">

@@ -82,6 +82,43 @@ export interface SyncQueue {
   created_at: number;
 }
 
+export type MealTargetMode = 'percent' | 'calories';
+
+export interface MealSetting {
+  id: string;
+  name: string;
+  time: string;
+  targetMode: MealTargetMode;
+  targetValue: number;
+}
+
+export interface ReminderSetting {
+  enabled: boolean;
+  time: string;
+}
+
+export interface UserSettings {
+  id: string;
+  user_id?: string | null;
+  nutrition: {
+    calorieBudget: number;
+    proteinPercent: number;
+    carbPercent: number;
+    fatPercent: number;
+    fiberGrams: number;
+  };
+  meals: MealSetting[];
+  reminders: {
+    food: ReminderSetting;
+    water: ReminderSetting;
+    workout: ReminderSetting;
+    walk: ReminderSetting;
+    weight: ReminderSetting;
+    medicine: ReminderSetting;
+  };
+  updated_at: string;
+  synced?: number;
+}
 
 export interface Activity {
   id: string; // uuid
@@ -167,6 +204,7 @@ export class MyDatabase extends Dexie {
   logs!: Table<DailyLog>;
   goals!: Table<Goal>;
   metrics!: Table<BodyMetric>;
+  settings!: Table<UserSettings>;
   activities!: Table<Activity>;
   activity_logs!: Table<ActivityLog>;
   sync_queue!: Table<SyncQueue>;
@@ -178,13 +216,14 @@ export class MyDatabase extends Dexie {
 
   constructor() {
     super('StupidCaloriesTrackerDB');
-    this.version(2).stores({
+    this.version(3).stores({
       profiles: 'id',
       foods: 'id, user_id, name, is_recipe, synced',
       food_ingredients: 'id, parent_food_id, child_food_id, synced',
       logs: 'id, user_id, date, meal_type, synced',
       goals: 'id, user_id, start_date, synced',
       metrics: 'id, user_id, date, type, synced',
+      settings: 'id, user_id, synced',
       activities: 'id, user_id, name, synced',
       activity_logs: 'id, user_id, date, activity_id, synced',
       sync_queue: '++id, table, action, created_at',
@@ -206,17 +245,13 @@ export class MyDatabase extends Dexie {
       // @ts-ignore
       this.table(tableName).hook('creating', (primKey, obj, transaction) => {
         if (obj.synced === 1) return; // synced from server
-        // obj.synced = 0; // Already set by default if not present? Better explicitly handle it.
-        // Actually, 'creating' hook allows modification of obj before save.
         obj.synced = 0; 
         
-        // Use setTimeout to escape the current transaction scope completely
-        // This is a workaround for Dexie.ignoreTransaction issues in some environments
         setTimeout(() => {
           this.sync_queue.add({
             table: tableName,
             action: 'create',
-            data: { ...obj, id: primKey }, // Ensure ID is included
+            data: { ...obj, id: primKey },
             created_at: Date.now()
           }).catch(err => console.error(`[DB] Failed to add to sync_queue for ${tableName}:`, err));
         }, 0);
@@ -224,9 +259,7 @@ export class MyDatabase extends Dexie {
 
       // @ts-ignore
       this.table(tableName).hook('updating', (mods, primKey, obj, transaction) => {
-        if ((mods as any).synced === 1) return; // synced from server
-
-        // creating a full object representation after update
+        if ((mods as any).synced === 1) return;
         const updatedObj = { ...obj, ...mods, synced: 0 };
         
         setTimeout(() => {
@@ -238,7 +271,7 @@ export class MyDatabase extends Dexie {
           }).catch(err => console.error(`[DB] Failed to add to sync_queue for ${tableName}:`, err));
         }, 0);
 
-        return { synced: 0 }; // Ensure the object in DB is marked as unsynced
+        return { synced: 0 };
       });
 
       // @ts-ignore

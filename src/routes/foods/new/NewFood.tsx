@@ -9,7 +9,68 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 
 const geminiApiKey = import.meta.env.VITE_GEMINI_API_KEY;
-const geminiModel = import.meta.env.VITE_GEMINI_MODEL || 'gemini-2.0-flash';
+const geminiModel = 'gemini-2.5-flash';
+
+const ESSENTIAL_VITAMIN_KEYS = [
+  'Vitamin A',
+  'Vitamin C',
+  'Vitamin D',
+  'Vitamin E',
+  'Vitamin B12',
+  'Vitamin B6',
+  'Folate (B9)'
+] as const;
+
+const ESSENTIAL_MINERAL_KEYS = [
+  'Calcium',
+  'Magnesium',
+  'Potassium',
+  'Zinc',
+  'Iron',
+  'Sodium',
+  'Iodine'
+] as const;
+
+const REQUIRED_MICRO_KEYS = [
+  ...ESSENTIAL_AMINO_ACIDS,
+  ...ESSENTIAL_VITAMIN_KEYS,
+  ...ESSENTIAL_MINERAL_KEYS
+] as const;
+
+const KEY_ALIASES: Record<string, string[]> = {
+  'Vitamin A': ['Vitamin A', 'vitamin_a', 'retinol', 'vitamin a rae'],
+  'Vitamin C': ['Vitamin C', 'vitamin_c', 'ascorbic acid'],
+  'Vitamin D': ['Vitamin D', 'vitamin_d', 'vitamin d3', 'cholecalciferol'],
+  'Vitamin E': ['Vitamin E', 'vitamin_e', 'alpha tocopherol', 'tocopherol'],
+  'Vitamin B12': ['Vitamin B12', 'vitamin_b12', 'b12', 'cobalamin'],
+  'Vitamin B6': ['Vitamin B6', 'vitamin_b6', 'b6', 'pyridoxine'],
+  'Folate (B9)': ['Folate (B9)', 'folate', 'vitamin_b9', 'folic acid', 'b9'],
+  Calcium: ['Calcium'],
+  Magnesium: ['Magnesium'],
+  Potassium: ['Potassium'],
+  Zinc: ['Zinc'],
+  Iron: ['Iron'],
+  Sodium: ['Sodium', 'Na'],
+  Iodine: ['Iodine']
+};
+
+const normalizeMicroKey = (value: string) => value.trim().toLowerCase().replace(/[_\s]+/g, ' ');
+
+const getMicroValue = (source: Record<string, unknown>, key: string): number => {
+  const normalizedEntries = Object.entries(source).reduce<Record<string, unknown>>((acc, [rawKey, rawValue]) => {
+    acc[normalizeMicroKey(rawKey)] = rawValue;
+    return acc;
+  }, {});
+
+  const candidates = KEY_ALIASES[key] ?? [key];
+  for (const candidate of candidates) {
+    const value = normalizedEntries[normalizeMicroKey(candidate)];
+    const numericValue = typeof value === 'number' ? value : Number(value);
+    if (Number.isFinite(numericValue)) return numericValue;
+  }
+
+  return 0;
+};
 
 
 const CreateFood: React.FC = () => {
@@ -45,9 +106,14 @@ const CreateFood: React.FC = () => {
         generationConfig: { responseMimeType: "application/json" }
       });
 
-      const prompt = `Act as a clinical nutrition database. Provide the full nutritional profile for "${name}" specifically for a serving size of ${servingSize}${servingUnit}. 
-      Return the data as a JSON object with these keys: "protein", "fat", "carbs", "calories", and "micros" (containing these 9 essential amino acids: Histidine, Isoleucine, Leucine, Lysine, Methionine, Phenylalanine, Threonine, Tryptophan, Valine). 
-      Values must be numbers representing grams.`;
+      const prompt = `Act as a clinical nutrition database. Provide the full nutritional profile for "${name}" specifically for a serving size of ${servingSize}${servingUnit}.
+    Return data ONLY as raw JSON with keys: "protein", "fat", "carbs", "calories", "micros".
+    For "micros", include ALL of the following keys even if unknown:
+    - Essential amino acids in grams: Histidine, Isoleucine, Leucine, Lysine, Methionine, Phenylalanine, Threonine, Tryptophan, Valine
+    - Essential vitamins: Vitamin A (mcg), Vitamin C (mg), Vitamin D (mcg), Vitamin E (mg), Vitamin B12 (mcg), Vitamin B6 (mg), Folate (B9) (mcg)
+    - Essential minerals: Calcium (mg), Magnesium (mg), Potassium (mg), Zinc (mg), Iron (mg), Sodium (mg), Iodine (mcg)
+    If any nutrient is not available for this food, set its value to 0.
+    All values must be numbers only. No markdown or prose.`;
 
       const result = await model.generateContent(prompt);
       const response = await result.response;
@@ -58,10 +124,10 @@ const CreateFood: React.FC = () => {
       setCarbs(data.carbs || 0);
       setFat(data.fat || 0);
       
-      if (data.micros) {
+      if (data.micros && typeof data.micros === 'object') {
         const cleanMicros: Record<string, number> = {};
-        ESSENTIAL_AMINO_ACIDS.forEach(amino => {
-          cleanMicros[amino] = data.micros[amino] || 0;
+        REQUIRED_MICRO_KEYS.forEach((microKey) => {
+          cleanMicros[microKey] = getMicroValue(data.micros, microKey);
         });
         setMicros(cleanMicros);
       }
@@ -69,7 +135,7 @@ const CreateFood: React.FC = () => {
       console.error("AI Fetch Error:", err);
       const message = err instanceof Error ? err.message : String(err);
       if (message.includes('not found') || message.includes('404')) {
-        alert(`Gemini model \"${geminiModel}\" is not available for this API key/version. Try setting VITE_GEMINI_MODEL=gemini-2.0-flash (or gemini-2.5-flash) in your .env.`);
+        alert(`Gemini model \"${geminiModel}\" is not available for this API key/version.`);
       } else {
         alert("Failed to fetch nutrition data.");
       }
@@ -87,9 +153,14 @@ const CreateFood: React.FC = () => {
 
   const copyAIPrompt = () => {
     const foodTarget = name || "[INSERT FOOD NAME]";
-    const prompt = `Act as a clinical nutrition database. Provide the full nutritional profile for "${foodTarget}" specifically for a serving size of ${servingSize}${servingUnit}. 
-Return the data ONLY as a raw JSON object with these keys: "protein", "fat", "carbs", "calories", and "micros" (containing these 9 essential amino acids: Histidine, Isoleucine, Leucine, Lysine, Methionine, Phenylalanine, Threonine, Tryptophan, Valine). 
-All values should be numbers representing grams in that ${servingSize}${servingUnit} serving. Do not include markdown or prose.`;
+    const prompt = `Act as a clinical nutrition database. Provide the full nutritional profile for "${foodTarget}" specifically for a serving size of ${servingSize}${servingUnit}.
+Return data ONLY as raw JSON with keys: "protein", "fat", "carbs", "calories", "micros".
+For "micros", include ALL of the following keys even if unknown:
+- Essential amino acids in grams: Histidine, Isoleucine, Leucine, Lysine, Methionine, Phenylalanine, Threonine, Tryptophan, Valine
+- Essential vitamins: Vitamin A (mcg), Vitamin C (mg), Vitamin D (mcg), Vitamin E (mg), Vitamin B12 (mcg), Vitamin B6 (mg), Folate (B9) (mcg)
+- Essential minerals: Calcium (mg), Magnesium (mg), Potassium (mg), Zinc (mg), Iron (mg), Sodium (mg), Iodine (mcg)
+If any nutrient is not available for this food, set its value to 0.
+All values must be numbers only. Do not include markdown or prose.`;
     
     navigator.clipboard.writeText(prompt);
     alert(`Prompt for ${servingSize}${servingUnit} copied!`);
@@ -107,10 +178,10 @@ All values should be numbers representing grams in that ${servingSize}${servingU
       if (data.protein !== undefined) setProtein(data.protein);
       if (data.carbs !== undefined) setCarbs(data.carbs);
       if (data.fat !== undefined) setFat(data.fat);
-      if (data.micros) {
+      if (data.micros && typeof data.micros === 'object') {
         const cleanMicros: Record<string, number> = {};
-        ESSENTIAL_AMINO_ACIDS.forEach(amino => {
-          if (data.micros[amino] !== undefined) cleanMicros[amino] = data.micros[amino];
+        REQUIRED_MICRO_KEYS.forEach((microKey) => {
+          cleanMicros[microKey] = getMicroValue(data.micros, microKey);
         });
         setMicros(cleanMicros);
       }

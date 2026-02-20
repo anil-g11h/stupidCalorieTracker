@@ -3,8 +3,26 @@ import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type Food } from '../../../lib/db';
 import { generateId } from '../../../lib';
+    import { analyzeEaaRatio, scoreFoodForEaaDeficit, type EaaRatioGroupKey } from '../../../lib/eaa';
 
 const WEIGHT_BASED_REGEX = /^(g|ml|oz)$/i;
+
+function formatServingLabel(food: Food): string {
+  const unit = (food.serving_unit || '').trim();
+  const size = food.serving_size;
+
+  if (unit && size && Number.isFinite(size) && size > 0) {
+    if (WEIGHT_BASED_REGEX.test(unit)) return `${size}${unit}`;
+    return `${size} ${unit}`;
+  }
+
+  if (unit) {
+    if (WEIGHT_BASED_REGEX.test(unit)) return `100${unit}`;
+    return `1 ${unit}`;
+  }
+
+  return '1 serving';
+}
 
 export default function AddLogEntry() {
   const [searchParams] = useSearchParams();
@@ -20,6 +38,34 @@ export default function AddLogEntry() {
   const [selectedFood, setSelectedFood] = useState<Food | null>(null);
   const [inputValue, setInputValue] = useState(1);
   const [selectedUnit, setSelectedUnit] = useState('serving');
+  const [addedCount, setAddedCount] = useState(0);
+  const [addedFoodIds, setAddedFoodIds] = useState<string[]>([]);
+  const [sortMode, setSortMode] = useState<'default' | 'eaa-gap'>('default');
+
+  const settingsRow = useLiveQuery(async () => db.settings.get('local-settings'), []);
+
+  const mealLabel = useMemo(() => {
+    const normalizedMealType = mealType.trim().toLowerCase();
+    const meals = (settingsRow as any)?.meals;
+
+    if (Array.isArray(meals)) {
+      const matchedMeal = meals.find((meal: any) => {
+        const id = String(meal?.id ?? '').trim().toLowerCase();
+        const name = String(meal?.name ?? '').trim().toLowerCase();
+        return id === normalizedMealType || name === normalizedMealType;
+      });
+
+      if (matchedMeal?.name) return String(matchedMeal.name);
+    }
+
+    const looksLikeUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(mealType);
+    if (looksLikeUuid) return 'Meal';
+
+    return mealType
+      .replace(/[-_]+/g, ' ')
+      .trim()
+      .replace(/\b\w/g, (char) => char.toUpperCase()) || 'Meal';
+  }, [mealType, settingsRow]);
 
   // --- Dexie Queries ---
   // 1. Initial Load for Editing
@@ -57,6 +103,69 @@ export default function AddLogEntry() {
     }
     return await db.foods.limit(20).toArray();
   }, [searchQuery]);
+
+  const dayNutritionContext = useLiveQuery(async () => {
+    const dayLogs = await db.logs.where('date').equals(date).toArray();
+    const dayFoodIds = [...new Set(dayLogs.map((log) => log.food_id))];
+    const dayFoods = dayFoodIds.length ? await db.foods.where('id').anyOf(dayFoodIds).toArray() : [];
+    const dayFoodsMap = dayFoods.reduce<Record<string, Food>>((acc, food) => {
+      acc[food.id] = food;
+      return acc;
+    }, {});
+
+    return { dayLogs, dayFoodsMap };
+  }, [date]);
+
+  const eaaDeficit = useMemo(() => {
+    if (!dayNutritionContext) {
+      return {
+        leucine: 0,
+        lysine: 0,
+        valineIsoleucine: 0,
+        rest: 0
+      };
+    }
+
+    return analyzeEaaRatio(
+      dayNutritionContext.dayLogs.map((log) => {
+        const food = dayNutritionContext.dayFoodsMap[log.food_id];
+        return {
+          proteinGrams: Number(food?.protein) || 0,
+          amountConsumed: Number(log.amount_consumed) || 0,
+          micros: food?.micros
+        };
+      })
+    ).deficitByGroup;
+  }, [dayNutritionContext]);
+
+  const rankedSearchResults = useMemo(() => {
+    if (!searchResults) return [];
+    if (sortMode === 'default') {
+      return searchResults.map((food) => ({
+        food,
+        score: 0,
+        bestGroup: null as EaaRatioGroupKey | null
+      }));
+    }
+
+    return [...searchResults]
+      .map((food) => {
+        const scoreData = scoreFoodForEaaDeficit(food.micros, eaaDeficit, 1);
+        const rankedGroups = (Object.keys(scoreData.filledByGroup) as EaaRatioGroupKey[])
+          .map((group) => ({ group, value: scoreData.filledByGroup[group] }))
+          .sort((a, b) => b.value - a.value);
+
+        return {
+          food,
+          score: scoreData.score,
+          bestGroup: rankedGroups[0]?.value > 0 ? rankedGroups[0].group : null
+        };
+      })
+      .sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        return b.food.protein - a.food.protein;
+      });
+  }, [searchResults, sortMode, eaaDeficit]);
 
   // --- Calculations (Derived State) ---
   const isWeightBased = useMemo(() => 
@@ -103,7 +212,7 @@ export default function AddLogEntry() {
     setSelectedUnit(newUnit);
   };
 
-  const saveLog = async () => {
+  const saveLog = async (stayOnPage = false) => {
     if (!selectedFood) return;
     try {
       const entry = {
@@ -117,7 +226,23 @@ export default function AddLogEntry() {
         created_at: new Date()
       };
       
-      logId ? await db.logs.put(entry) : await db.logs.add(entry);
+      if (logId) {
+        await db.logs.put(entry);
+        navigate(`/log?date=${date}`);
+        return;
+      }
+
+      await db.logs.add(entry);
+
+      if (stayOnPage) {
+        setAddedCount((count) => count + 1);
+        setAddedFoodIds((ids) => (ids.includes(selectedFood.id) ? ids : [...ids, selectedFood.id]));
+        setSelectedFood(null);
+        setInputValue(1);
+        setSelectedUnit('serving');
+        return;
+      }
+
       navigate(`/log?date=${date}`);
     } catch (error) {
       console.error('Failed to save log:', error);
@@ -131,7 +256,15 @@ export default function AddLogEntry() {
         <Link to={`/log?date=${date}`} className="mr-4 text-text-muted hover:text-text-main">
           &larr; Back
         </Link>
-        <h1 className="text-2xl font-bold capitalize text-text-main">Add to {mealType}</h1>
+        <h1 className="text-2xl font-bold text-text-main">Add to {mealLabel}</h1>
+        {!logId && (
+          <button
+            onClick={() => navigate(`/log?date=${date}`)}
+            className="ml-auto px-3 py-1.5 rounded-full text-xs font-bold bg-brand text-brand-fg hover:opacity-90 transition-opacity"
+          >
+            Done{addedCount > 0 ? ` (${addedCount})` : ''}
+          </button>
+        )}
       </div>
 
       {!selectedFood ? (
@@ -145,22 +278,72 @@ export default function AddLogEntry() {
               className="w-full p-3 bg-surface text-text-main border border-transparent rounded-lg shadow-sm focus:ring-2 focus:ring-brand focus:outline-none"
             />
           </div>
-          <div className="space-y-2">
-            {searchResults?.map(food => (
+          <div className="mb-3 flex items-center justify-between">
+            <p className="text-[11px] text-text-muted">Sort foods by daily EAA gap fill</p>
+            <div className="rounded-lg border border-border-subtle bg-surface p-1 flex items-center gap-1">
               <button
-                key={food.id}
-                onClick={() => handleSelectFood(food)}
-                className="w-full text-left p-4 bg-card border border-border-subtle rounded-lg shadow-sm hover:bg-surface transition-colors flex justify-between items-center"
+                type="button"
+                onClick={() => setSortMode('default')}
+                className={`px-2.5 py-1 text-[11px] font-bold rounded-md transition-colors ${sortMode === 'default' ? 'bg-brand text-brand-fg' : 'text-text-muted hover:text-text-main'}`}
               >
-                <div>
-                  <div className="font-bold text-lg text-text-main">{food.name}</div>
-                  <div className="text-sm text-text-muted">
-                    {food.brand ? `${food.brand} • ` : ''}{food.calories} cal
-                  </div>
-                </div>
-                <div className="text-brand text-2xl">+</div>
+                Default
               </button>
-            )) || <div className="text-center text-text-muted mt-8 italic">Start typing to search...</div>}
+              <button
+                type="button"
+                onClick={() => setSortMode('eaa-gap')}
+                className={`px-2.5 py-1 text-[11px] font-bold rounded-md transition-colors ${sortMode === 'eaa-gap' ? 'bg-brand text-brand-fg' : 'text-text-muted hover:text-text-main'}`}
+              >
+                EAA Gap
+              </button>
+            </div>
+          </div>
+          <div className="space-y-2">
+            {rankedSearchResults?.map(({ food, score, bestGroup }) => {
+              const alreadyAdded = addedFoodIds.includes(food.id);
+
+              const bestGroupLabel =
+                bestGroup === 'leucine'
+                  ? 'Leucine'
+                  : bestGroup === 'lysine'
+                    ? 'Lysine'
+                    : bestGroup === 'valineIsoleucine'
+                      ? 'Val+Iso'
+                      : bestGroup === 'rest'
+                        ? 'Rest EAAs'
+                        : null;
+
+              return (
+                <button
+                  key={food.id}
+                  onClick={() => handleSelectFood(food)}
+                  className="w-full text-left p-4 bg-card border border-border-subtle rounded-lg shadow-sm hover:bg-surface transition-colors flex justify-between items-center"
+                >
+                  <div>
+                    <div className="font-bold text-lg text-text-main">{food.name}</div>
+                    <div className="text-sm text-text-muted">
+                      {food.brand ? `${food.brand} • ` : ''}{food.calories} cal / {formatServingLabel(food)}
+                    </div>
+                    {sortMode === 'eaa-gap' && (
+                      <div className="text-[11px] text-text-muted mt-1">
+                        {score > 0
+                          ? `EAA fit +${(Math.round(score * 100) / 100).toFixed(2)}g${bestGroupLabel ? ` (${bestGroupLabel})` : ''}`
+                          : 'No EAA gap contribution'}
+                      </div>
+                    )}
+                    <MacroContributionBar
+                      protein={food.protein}
+                      carbs={food.carbs}
+                      fat={food.fat}
+                    />
+                  </div>
+                  {alreadyAdded ? (
+                    <div className="w-8 h-8 rounded-full bg-green-500 text-white text-lg font-black flex items-center justify-center">✓</div>
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-brand text-brand-fg text-2xl flex items-center justify-center">+</div>
+                  )}
+                </button>
+              );
+            }) || <div className="text-center text-text-muted mt-8 italic">Start typing to search...</div>}
           </div>
         </>
       ) : (
@@ -222,9 +405,26 @@ export default function AddLogEntry() {
             </div>
           </div>
 
-          <button onClick={saveLog} className="w-full bg-brand text-brand-fg py-4 rounded-xl text-lg font-bold shadow-lg hover:opacity-90 transition-opacity">
-            {logId ? 'Update Log' : 'Add to Log'}
-          </button>
+          {logId ? (
+            <button onClick={() => saveLog(false)} className="w-full bg-brand text-brand-fg py-4 rounded-xl text-lg font-bold shadow-lg hover:opacity-90 transition-opacity">
+              Update Log
+            </button>
+          ) : (
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => saveLog(true)}
+                className="w-full bg-brand text-brand-fg py-4 rounded-xl text-base font-bold shadow-lg hover:opacity-90 transition-opacity"
+              >
+                Add & Continue
+              </button>
+              <button
+                onClick={() => saveLog(false)}
+                className="w-full bg-surface text-text-main py-4 rounded-xl text-base font-bold border border-border-subtle hover:bg-card transition-colors"
+              >
+                Add & Finish
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -256,3 +456,30 @@ const StepperBtn = ({ onClick, children }: any) => (
     {children}
   </button>
 );
+
+const MacroContributionBar = ({
+  protein,
+  carbs,
+  fat
+}: {
+  protein: number;
+  carbs: number;
+  fat: number;
+}) => {
+  const proteinKcal = Math.max(0, protein * 4);
+  const carbsKcal = Math.max(0, carbs * 4);
+  const fatKcal = Math.max(0, fat * 9);
+  const totalKcal = Math.max(1, proteinKcal + carbsKcal + fatKcal);
+
+  const proteinPct = (proteinKcal / totalKcal) * 100;
+  const carbsPct = (carbsKcal / totalKcal) * 100;
+  const fatPct = (fatKcal / totalKcal) * 100;
+
+  return (
+    <div className="mt-2 h-2 rounded-full overflow-hidden bg-surface border border-border-subtle flex w-40 max-w-full">
+      <div className="bg-macro-protein" style={{ width: `${proteinPct}%` }} title={`${protein.toFixed(1)}p`} />
+      <div className="bg-macro-carbs" style={{ width: `${carbsPct}%` }} title={`${carbs.toFixed(1)}c`} />
+      <div className="bg-macro-fat" style={{ width: `${fatPct}%` }} title={`${fat.toFixed(1)}f`} />
+    </div>
+  );
+};
