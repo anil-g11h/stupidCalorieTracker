@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Link } from 'react-router-dom';
 import { db, type Food, type Goal, type UserSettings } from '../lib/db';
@@ -28,10 +28,20 @@ function getWorkoutDurationMinutes(startTime: string, endTime?: string) {
   return Math.round((end - start) / 60000);
 }
 
+function goalsStorageKey(date: string) {
+  return `home-goals-tracking:${date}`;
+}
+
+function summaryStorageKey(date: string) {
+  return `home-day-summary:${date}`;
+}
+
 export default function Home() {
   const now = new Date();
   const today = useMemo(() => toYyyyMmDd(now), [now]);
   const weekStartIso = useMemo(() => getWeekStart(now).toISOString(), [now]);
+  const [trackedGoals, setTrackedGoals] = useState<Record<string, boolean>>({});
+  const [daySummary, setDaySummary] = useState('');
 
   const data = useLiveQuery(async () => {
     const [todayLogs, settings, workouts, goal] = await Promise.all([
@@ -100,13 +110,56 @@ export default function Home() {
   const proteinProgress = Math.min((proteinConsumed / Math.max(1, proteinGoal)) * 100, 100);
   const carbsProgress = Math.min((carbsConsumed / Math.max(1, carbsGoal)) * 100, 100);
   const fatProgress = Math.min((fatConsumed / Math.max(1, fatGoal)) * 100, 100);
-  const macrosConfiguredCount = [proteinGoal, carbsGoal, fatGoal].filter((target) => target > 0).length;
-  const extraGoalsCount = [
+  const trackableGoals = useMemo(() => {
+    const goals = [{ id: 'carbs', label: 'Carbs', detail: `${carbsConsumed} / ${carbsGoal} g` }];
+
+    if ((data?.goal?.sleep_target ?? 0) > 0) {
+      goals.push({ id: 'sleep', label: 'Sleep', detail: `Target: ${data?.goal?.sleep_target} hrs` });
+    }
+    if ((data?.goal?.water_target ?? 0) > 0) {
+      goals.push({ id: 'water', label: 'Water', detail: `Target: ${data?.goal?.water_target} ml` });
+    }
+    if ((data?.goal?.weight_target ?? 0) > 0) {
+      goals.push({ id: 'weight', label: 'Weight', detail: `Target: ${data?.goal?.weight_target}` });
+    }
+    return goals;
+  }, [
+    carbsConsumed,
+    carbsGoal,
     data?.goal?.sleep_target,
     data?.goal?.water_target,
-    data?.goal?.weight_target,
-    data?.settings?.nutrition?.fiberGrams
-  ].filter((value) => value !== undefined && value !== null && Number(value) > 0).length;
+    data?.goal?.weight_target
+  ]);
+
+  const completedTrackedCount = trackableGoals.filter((goal) => trackedGoals[goal.id]).length;
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    try {
+      const storedGoals = window.localStorage.getItem(goalsStorageKey(today));
+      setTrackedGoals(storedGoals ? JSON.parse(storedGoals) : {});
+    } catch {
+      setTrackedGoals({});
+    }
+
+    const storedSummary = window.localStorage.getItem(summaryStorageKey(today));
+    setDaySummary(storedSummary ?? '');
+  }, [today]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(goalsStorageKey(today), JSON.stringify(trackedGoals));
+  }, [today, trackedGoals]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(summaryStorageKey(today), daySummary);
+  }, [today, daySummary]);
+
+  const handleGoalToggle = (goalId: string) => {
+    setTrackedGoals((prev) => ({ ...prev, [goalId]: !prev[goalId] }));
+  };
 
   return (
     <div className="min-h-screen bg-page pb-24 font-sans">
@@ -195,19 +248,52 @@ export default function Home() {
           <p className="mt-3 text-xs font-medium text-text-muted">Total workouts logged: {data?.workoutsCount ?? 0}</p>
         </Link>
 
-        <Link
-          to="/profile"
-          className="block bg-card rounded-2xl p-5 border border-border-subtle shadow-sm hover:border-brand-light transition-all active:scale-[0.99]"
-        >
-          <p className="text-sm font-bold uppercase tracking-wide text-text-muted">Different goals</p>
-          <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-            <p className="text-text-main font-bold bg-surface px-2.5 py-2 rounded-lg">Calorie: {Math.round(calorieGoal)} kcal</p>
-            <p className="text-text-main font-bold bg-surface px-2.5 py-2 rounded-lg">Macros: {macrosConfiguredCount}</p>
-            <p className="text-text-main font-bold bg-surface px-2.5 py-2 rounded-lg">Meals: {data?.settings?.meals?.length ?? 0}</p>
-            <p className="text-text-main font-bold bg-surface px-2.5 py-2 rounded-lg">Extra: {extraGoalsCount}</p>
+        <section className="bg-card rounded-2xl p-5 border border-border-subtle shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-bold uppercase tracking-wide text-text-muted">Track goals</p>
+            <p className="text-xs font-bold text-text-main bg-surface px-2.5 py-1 rounded-full">
+              {completedTrackedCount}/{trackableGoals.length} done
+            </p>
           </div>
-          <p className="mt-3 text-xs font-medium text-text-muted">Tap to update nutrition, meals, reminders, and goal targets.</p>
-        </Link>
+
+          <div className="mt-3 space-y-2">
+            {trackableGoals.map((goal) => (
+              <label
+                key={goal.id}
+                className="flex items-center justify-between gap-3 bg-surface px-3 py-2 rounded-lg cursor-pointer"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-text-main">{goal.label}</p>
+                  <p className="text-xs text-text-muted truncate">{goal.detail}</p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={Boolean(trackedGoals[goal.id])}
+                  onChange={() => handleGoalToggle(goal.id)}
+                  className="h-4 w-4 accent-brand"
+                />
+              </label>
+            ))}
+          </div>
+
+          <div className="mt-4">
+            <label htmlFor="day-summary" className="block text-xs font-bold uppercase tracking-wide text-text-muted mb-2">
+              Day summary
+            </label>
+            <input
+              id="day-summary"
+              type="text"
+              value={daySummary}
+              onChange={(event) => setDaySummary(event.target.value)}
+              placeholder="How did today go?"
+              className="w-full rounded-lg border border-border-subtle bg-surface px-3 py-2 text-sm text-text-main placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand/30"
+            />
+          </div>
+
+          <Link to="/profile" className="mt-3 inline-block text-xs font-medium text-text-muted hover:text-text-main">
+            Manage goals and reminders
+          </Link>
+        </section>
       </main>
     </div>
   );
