@@ -41,6 +41,7 @@
 		"@types/uuid": "^10.0.0",
 		"chrono-node": "^2.9.0",
 		"date-fns": "^4.1.0",
+		"svelte-spa-router": "^4.0.1",
 		"uuid": "^13.0.0"
 	}
 }
