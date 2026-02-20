@@ -3,7 +3,7 @@
 # Exit on error
 set -e
 
-BUILD_DIR=".svelte-kit/output/client"
+BUILD_DIR="build"
 TEMP_DIR="../temp-client"
 PREV_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
