@@ -6,7 +6,9 @@
   import { onMount, onDestroy } from 'svelte';
 
   // Get query params from hash
+  import { BASE_URL } from '../../../lib/constants';
   function getParam(name: string) {
+    if (typeof window === 'undefined') return null;
     const params = new URLSearchParams(window.location.hash.split('?')[1] || '');
     return params.get(name);
   }

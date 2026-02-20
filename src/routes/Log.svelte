@@ -6,7 +6,14 @@
   import {replace} from 'svelte-spa-router';
 
   // Date State
-  let date = new URLSearchParams(window.location.search).get('date') || new Date().toISOString().split('T')[0];
+  import { BASE_URL } from '$lib/constants';
+  // Use hash for query params in SPA routing
+  function getParam(name: string) {
+    if (typeof window === 'undefined') return null;
+    const params = new URLSearchParams(window.location.hash.split('?')[1] || '');
+    return params.get(name);
+  }
+  let date = getParam('date') || new Date().toISOString().split('T')[0];
   
   
   // Date Display Logic

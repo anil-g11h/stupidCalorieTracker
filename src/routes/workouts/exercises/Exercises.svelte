@@ -4,7 +4,9 @@
   import { generateId } from '../../../lib';
   import { METRIC_TYPES, type MetricType } from '../../../lib/workouts';
 
+  import { BASE_URL } from '../../../lib/constants';
   function getParam(name: string) {
+    if (typeof window === 'undefined') return null;
     const params = new URLSearchParams(window.location.hash.split('?')[1] || '');
     return params.get(name);
   }
@@ -29,15 +31,16 @@
 
   // For navigation
   import { push as goto } from 'svelte-spa-router';
+  // Use BASE_URL for navigation
 
   // View Transition API navigation for create page
   function handleCreateClick() {
     if (typeof document !== 'undefined' && 'startViewTransition' in document) {
       (document as any).startViewTransition(() => {
-        goto('/workouts/exercises/new');
+        goto(`/${BASE_URL}/#/workouts/exercises/new`);
       });
     } else {
-      goto('/workouts/exercises/new');
+      goto(`/${BASE_URL}/#/workouts/exercises/new`);
     }
   }
   const MUSCLE_GROUPS = ['Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Core', 'Cardio', 'Other'];

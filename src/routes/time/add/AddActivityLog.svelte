@@ -1,10 +1,12 @@
 <script lang="ts">
   import { db } from '../../../lib/db';
+  import { BASE_URL } from '../../../lib/constants';
   import { liveQuery } from 'dexie';
   import { generateId } from '../../../lib';
   import { push } from 'svelte-spa-router';
 
   function getParam(name: string) {
+    if (typeof window === 'undefined') return null;
     const params = new URLSearchParams(window.location.hash.split('?')[1] || '');
     return params.get(name);
   }
