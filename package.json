@@ -37,6 +37,7 @@
 		"@vitejs/plugin-react": "^5.1.4",
 		"chrono-node": "^2.9.0",
 		"date-fns": "^4.1.0",
+		"dexie-react-hooks": "^4.2.0",
 		"react": "^19.2.4",
 		"react-dom": "^19.2.4",
 		"react-router-dom": "^7.13.0",
