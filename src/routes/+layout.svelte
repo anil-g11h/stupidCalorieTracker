@@ -1,4 +1,4 @@
-<script lang="ts">
+<!-- <script lang="ts">
 	import '../app.css';
 	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	import { onMount, type Snippet } from 'svelte';
@@ -43,4 +43,4 @@
 
 
     <BottomNav />
-</div>
+</div> -->

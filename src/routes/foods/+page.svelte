@@ -6,7 +6,6 @@
   let searchQuery = '';
   
   // Create a live query for foods
-    import { base } from '$app/paths';
   let foods = liveQuery(() => db.foods.toArray());
 
   // Filtered foods based on search query
@@ -23,10 +22,10 @@
   <div class="flex justify-between items-center mb-6">
     <h1 class="text-2xl font-bold">Foods</h1>
     <div class="space-x-2">
-      <a href="{base}/foods/new" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">
+      <a href="#/foods/new" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">
         Add Food
       </a>
-      <a href="{base}/foods/new-recipe" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded">
+      <a href="#/foods/new-recipe" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded">
         Create Recipe
       </a>
     </div>
@@ -48,7 +47,7 @@
   {:else}
     <div class="grid gap-4">
       {#each filteredFoods as food (food.id)}
-        <a href="{base}/foods/{food.id}" class="bg-card p-4 rounded-xl shadow-sm border border-border-subtle flex justify-between items-center hover:bg-surface transition-colors block cursor-pointer">
+        <a href="#/foods/{food.id}" class="bg-card p-4 rounded-xl shadow-sm border border-border-subtle flex justify-between items-center hover:bg-surface transition-colors block cursor-pointer">
           <div>
             <h3 class="font-bold text-lg text-text-main">{food.name}</h3>
             {#if food.brand}

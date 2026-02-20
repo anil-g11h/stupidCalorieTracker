@@ -172,7 +172,7 @@
         </button>
       </div>
 
-      <a href="/foods" class="text-text-muted hover:text-brand transition-colors p-2" aria-label="Manage Foods">
+      <a href="/#/foods" class="text-text-muted hover:text-brand transition-colors p-2" aria-label="Manage Foods">
         <Utensils size={20} />
       </a>
     </div>

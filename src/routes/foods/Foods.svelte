@@ -5,6 +5,7 @@
 
   let searchQuery = '';
   let foods = liveQuery(() => db.foods.toArray());
+  const BASE_URL = '';
 
   $: filteredFoods = $foods 
     ? $foods.filter(food => 

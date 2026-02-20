@@ -2,22 +2,18 @@
 	"compilerOptions": {
 		"target": "ESNext",
 		"useDefineForClassFields": true,
+		"lib": ["DOM", "DOM.Iterable", "ESNext"],
 		"module": "esnext",
-		"rewriteRelativeImportExtensions": true,
-		"allowJs": true,
-		"checkJs": true,
 		"esModuleInterop": true,
 		"forceConsistentCasingInFileNames": true,
 		"resolveJsonModule": true,
 		"skipLibCheck": true,
 		"sourceMap": true,
 		"strict": true,
-		"moduleResolution": "bundler",
-		"paths": {
-			"$lib": ["./src/lib"],
-			"$lib/*": ["./src/lib/*"]
-		}
+		"moduleResolution": "node",
+		"allowSyntheticDefaultImports": true,
+		"jsx": "react-jsx"
 	},
-	"include": ["src/**/*.d.ts", "src/**/*.ts", "src/**/*.js", "src/**/*.svelte"],
-	"exclude": ["node_modules"]
+	"include": ["src/**/*.d.ts", "src/**/*.ts", "src/**/*.tsx", "src/**/*.js", "src/**/*.jsx"],
+	"exclude": ["node_modules", "*.svelte", "src/**/*.svelte"]
 }
