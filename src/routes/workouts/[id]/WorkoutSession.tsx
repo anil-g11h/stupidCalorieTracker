@@ -4,20 +4,21 @@ import { useLiveQuery } from 'dexie-react-hooks';
 // import { 
 //   Plus, Check, Trash, MoreVertical, Settings, Timer, ChevronDown 
 // } from 'lucide-react';
-import { 
-  PlusIcon as Plus, 
-  CheckIcon as Check, 
-  TrashIcon as Trash, 
-  DotsThreeVerticalIcon as MoreVertical, 
-  GearSixIcon as Settings, 
-  TimerIcon as Timer, 
-  CaretDownIcon as ChevronDown 
+import {
+  PlusIcon as Plus,
+  CheckIcon as Check,
+  TrashIcon as Trash,
+  DotsThreeVerticalIcon as MoreVertical,
+  GearSixIcon as Settings,
+  TimerIcon as Timer,
+  CaretDownIcon as ChevronDown
 } from "@phosphor-icons/react";
 import { db, type Workout, type WorkoutExerciseDef, type WorkoutLogEntry, type WorkoutSet } from '../../../lib/db';
 import { generateId } from '../../../lib';
-import { 
-  getMetricConfig, getPreviousWorkoutSets, formatSet, METRIC_TYPES 
+import {
+  getMetricConfig, getPreviousWorkoutSets, formatSet, METRIC_TYPES
 } from '../../../lib/workouts';
+import { useStackNavigation } from '../../../lib/useStackNavigation';
 
 
 
@@ -31,7 +32,7 @@ const StatItem = ({ label, value, border }: { label: string, value: string | num
 );
 
 
-  interface RestTimer {
+interface RestTimer {
   seconds: number;
   total: number;
 }
@@ -43,11 +44,11 @@ const WorkoutSessionComponent = ({
   const navigate = useNavigate();
   const workoutId = id === 'new' ? null : id;
 
+  const { push } = useStackNavigation();
 
 
 
-
-// --- Missing Functions ---
+  // --- Missing Functions ---
 
   /**
    * Cancels the current workout. 
@@ -99,10 +100,10 @@ const WorkoutSessionComponent = ({
 
       // Calculate new remaining time
       const newSeconds = Math.max(0, prev.seconds + adjustmentSeconds);
-      
+
       // Calculate new end time based on the current moment + new remaining seconds
       const newEndTime = Date.now() + (newSeconds * 1000);
-      
+
       // Update total if we increased the time beyond the original total
       const newTotal = adjustmentSeconds > 0 ? Math.max(prev.total, newSeconds) : prev.total;
 
@@ -121,7 +122,7 @@ const WorkoutSessionComponent = ({
   const skipRestTimer = () => {
     // Simply nullify the state; the useEffect cleanup handles the interval disposal
     setActiveRestTimer(null);
-    
+
     // Optional: Stop vibration if skip is pressed during alert
     if ('vibrate' in navigator) navigator.vibrate(0);
   };
@@ -133,21 +134,21 @@ const WorkoutSessionComponent = ({
 
   // --- UI State ---
   const [elapsedTime, setElapsedTime] = useState('00:00');
-  const [activeRestTimer, setActiveRestTimer] = useState<{ 
-    exerciseId: string, seconds: number, total: number, endTime: number 
+  const [activeRestTimer, setActiveRestTimer] = useState<{
+    exerciseId: string, seconds: number, total: number, endTime: number
   } | null>(null);
   const [expandedMenuId, setExpandedMenuId] = useState<string | null>(null);
   const [restPreferences, setRestPreferences] = useState<Record<string, number>>({});
 
   // --- Database Queries ---
   const workout = useLiveQuery(() => workoutId ? db.workouts.get(workoutId) : undefined, [workoutId]);
-  
+
   const definitions = useLiveQuery(async () => {
     const defs = await db.workout_exercises_def.toArray();
     return defs.reduce((acc: any, d: { id: any; }) => ({ ...acc, [d.id]: d }), {} as Record<string, WorkoutExerciseDef>);
   }, []);
 
-  const exercises = useLiveQuery(() => 
+  const exercises = useLiveQuery(() =>
     workoutId ? db.workout_log_entries.where('workout_id').equals(workoutId).sortBy('sort_order') : [],
     [workoutId]
   );
@@ -156,7 +157,7 @@ const WorkoutSessionComponent = ({
     if (!exercises?.length) return {};
     const entryIds = exercises.map((e: { id: any; }) => e.id);
     const allSets = await db.workout_sets.where('workout_log_entry_id').anyOf(entryIds).toArray();
-    
+
     const mapped = exercises.reduce((acc: any, e: { id: any; }) => ({ ...acc, [e.id]: [] }), {} as Record<string, WorkoutSet[]>);
     allSets.forEach((s: { workout_log_entry_id: string | number; }) => mapped[s.workout_log_entry_id]?.push(s));
     Object.keys(mapped).forEach(k => mapped[k].sort((a: { set_number: number; }, b: { set_number: number; }) => a.set_number - b.set_number));
@@ -179,7 +180,7 @@ const WorkoutSessionComponent = ({
       };
       createWorkout();
     }
-    
+
     // Load local storage prefs
     const stored = localStorage.getItem('rest_timer_preferences');
     if (stored) setRestPreferences(JSON.parse(stored));
@@ -195,7 +196,7 @@ const WorkoutSessionComponent = ({
       const h = Math.floor(diff / 3600);
       const m = Math.floor((diff % 3600) / 60);
       const s = diff % 60;
-      setElapsedTime(h > 0 
+      setElapsedTime(h > 0
         ? `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
         : `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
       );
@@ -222,7 +223,7 @@ const WorkoutSessionComponent = ({
   const handleToggleSet = async (setId: string, completed: boolean, entryId: string, defId: string) => {
     const newStatus = !completed;
     await db.workout_sets.update(setId, { completed: newStatus, synced: 0 });
-    
+
     if (newStatus) {
       const restTime = restPreferences[defId] || 60;
       startRestTimer(entryId, restTime);
@@ -232,7 +233,7 @@ const WorkoutSessionComponent = ({
   const startRestTimer = (exerciseId: string, seconds: number) => {
     const endTime = Date.now() + seconds * 1000;
     setActiveRestTimer({ exerciseId, seconds, total: seconds, endTime });
-    
+
     // PWA Notification logic (simplified)
     if ('Notification' in window && Notification.permission === 'granted') {
       new Notification('Rest Timer Started', { body: `${seconds}s remaining` });
@@ -242,7 +243,7 @@ const WorkoutSessionComponent = ({
   // Rest Timer countdown effect
   useEffect(() => {
     if (!activeRestTimer) return;
-    
+
     const interval = setInterval(() => {
       const remaining = Math.ceil((activeRestTimer.endTime - Date.now()) / 1000);
       if (remaining <= 0) {
@@ -257,20 +258,28 @@ const WorkoutSessionComponent = ({
     return () => clearInterval(interval);
   }, [activeRestTimer?.endTime]);
 
+
+  // Trigger this when clicking "Add Exercise"
+  const handleAddExercises = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    push(`/workouts/exercises?workoutId=${workoutId}`);
+  };
+
+
   return (
     <div className="pb-32 pt-4 px-4 max-w-md mx-auto min-h-screen bg-background">
       {/* Sticky Header */}
       <header className="mb-6 sticky top-0 bg-background z-20 py-2 border-b border-border-subtle -mx-4 px-4">
         <div className="flex justify-between items-center mb-2">
           <h1 className="text-xl font-bold truncate">{workout?.name || 'Workout'}</h1>
-          <button 
+          <button
             onClick={() => navigate('/workouts')}
             className="bg-brand text-white px-5 py-2 rounded-xl text-sm font-bold shadow-md"
           >
             Finish
           </button>
         </div>
-        
+
         <div className="flex justify-between text-xs font-semibold text-text-muted uppercase">
           <StatItem label="Duration" value={elapsedTime} />
           <StatItem label="Volume" value={`${totalStats.volume} kg`} border />
@@ -303,20 +312,20 @@ const WorkoutSessionComponent = ({
                   <div key={set.id} className="grid grid-cols-12 gap-2 items-center">
                     <span className="col-span-1 text-center text-text-muted font-bold">{set.set_number}</span>
                     <div className="col-span-9 grid grid-cols-2 gap-2">
-                      <input 
-                        type="number" 
+                      <input
+                        type="number"
                         defaultValue={set.weight}
                         className="bg-surface p-2 rounded text-center font-bold"
                         onChange={(e) => db.workout_sets.update(set.id, { weight: Number(e.target.value) })}
                       />
-                      <input 
-                        type="number" 
+                      <input
+                        type="number"
                         defaultValue={set.reps}
                         className="bg-surface p-2 rounded text-center font-bold"
                         onChange={(e) => db.workout_sets.update(set.id, { reps: Number(e.target.value) })}
                       />
                     </div>
-                    <button 
+                    <button
                       onClick={() => handleToggleSet(set.id, set.completed, exercise.id, exercise.exercise_id)}
                       className={`col-span-2 h-10 rounded-lg flex items-center justify-center ${set.completed ? 'bg-green-500 text-white' : 'bg-surface'}`}
                     >
@@ -326,7 +335,7 @@ const WorkoutSessionComponent = ({
                 ))}
               </div>
 
-              <button 
+              <button
                 onClick={async () => {
                   const lastSet = currentSets[currentSets.length - 1];
                   await db.workout_sets.add({
@@ -349,19 +358,19 @@ const WorkoutSessionComponent = ({
         })}
       </div>
       <div className="relative">
-      <div className="pt-2">
-        {/* In Hash Routing, we use a standard 'a' tag or 'Link' from react-router-dom */}
-        <a
-          href={`#/workouts/exercises?workoutId=${workoutId}`}
-          className="group flex w-full flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border-subtle p-6 text-center transition-colors hover:border-brand hover:bg-brand/5"
-        >
-          <div className="rounded-full bg-surface-secondary p-3 transition-colors group-hover:bg-brand group-hover:text-white mb-2 text-text-muted">
-            <Plus size={24} />
-          </div>
-          <span className="font-bold text-text-primary">Add Exercise</span>
-          <span className="text-xs text-text-muted">Search or create new</span>
-        </a>
-      </div>
+        <div className="pt-2">
+          {/* In Hash Routing, we use a standard 'a' tag or 'Link' from react-router-dom */}
+          <button
+            onClick={handleAddExercises}
+            className="group flex w-full flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border-subtle p-6 text-center transition-colors hover:border-brand hover:bg-brand/5 cursor-pointer"
+          >
+            <div className="rounded-full bg-surface-secondary p-3 transition-colors group-hover:bg-brand group-hover:text-white mb-2 text-text-muted">
+              <Plus size={24} />
+            </div>
+            <span className="font-bold text-text-primary">Add Exercise</span>
+            <span className="text-xs text-text-muted">Search or create new</span>
+          </button>
+        </div>
       </div>
 
       <button
@@ -374,7 +383,7 @@ const WorkoutSessionComponent = ({
       {/* Conditional Rendering (Replaces Svelte {#if}) */}
       {activeRestTimer && (
         <div className="fixed bottom-[calc(3.2rem+env(safe-area-inset-bottom)+1rem)] left-4 right-4 bg-page text-text-main shadow-2xl z-50 flex flex-col items-stretch animate-in slide-in-from-bottom rounded-2xl overflow-hidden">
-          
+
           {/* Progress Bar */}
           <div className="h-1.5 w-full bg-border-subtle absolute top-0 left-0 right-0 z-0">
             <div
