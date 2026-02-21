@@ -1,13 +1,53 @@
-import { db, type SyncQueue } from '$lib/db';
+import { db, type SyncQueue } from './db';
 import { supabase } from './supabaseClient';
 import Dexie from 'dexie';
 
 const SYNC_INTERVAL_MS = 30000; // 30 seconds
-const LAST_SYNCED_KEY = 'stupid_calorie_tracker_last_synced';
+const LAST_SYNCED_KEY_BASE = 'stupid_calorie_tracker_last_synced';
 
 export class SyncManager {
   private syncInterval: ReturnType<typeof setInterval> | null = null;
   private isSyncing = false;
+
+    private async reconcileDeletedFoods() {
+        const PAGE_SIZE = 500;
+        const remoteFoodIds = new Set<string>();
+        let page = 0;
+
+        while (true) {
+            const from = page * PAGE_SIZE;
+            const to = from + PAGE_SIZE - 1;
+            const { data, error } = await supabase
+                .from('foods')
+                .select('id')
+                .order('id', { ascending: true })
+                .range(from, to);
+
+            if (error) throw error;
+
+            const rows = data ?? [];
+            for (const row of rows) {
+                if (row?.id) remoteFoodIds.add(row.id);
+            }
+
+            if (rows.length < PAGE_SIZE) break;
+            page += 1;
+        }
+
+        const localSyncedFoodIds = (await db.foods.where('synced').equals(1).primaryKeys()) as string[];
+        const idsToDelete = localSyncedFoodIds.filter((id) => !remoteFoodIds.has(id));
+
+        if (idsToDelete.length > 0) {
+            await db.foods.bulkDelete(idsToDelete);
+            console.log(`[SyncManager] Removed ${idsToDelete.length} locally cached foods deleted remotely`);
+        }
+    }
+
+    private getLastSyncedKey(session: any): string {
+        const userId = session?.user?.id;
+        if (userId) return `${LAST_SYNCED_KEY_BASE}_${userId}`;
+        return `${LAST_SYNCED_KEY_BASE}_public`;
+    }
 
   constructor() {
       if (typeof window !== 'undefined') {
@@ -109,8 +149,7 @@ export class SyncManager {
       
       await this.pushChanges(session);
       await this.pullChanges(session);
-      
-      localStorage.setItem(LAST_SYNCED_KEY, new Date().toISOString()); 
+
       console.log('[SyncManager] Sync complete.');
     } catch (error) {
       console.error('[SyncManager] Sync failed:', error);
@@ -120,7 +159,6 @@ export class SyncManager {
   }
 
   async pushChanges(session: any) {
-    // Process queue in order
     const queue = await db.sync_queue.orderBy('created_at').toArray();
     if (queue.length === 0) return;
 
@@ -129,9 +167,43 @@ export class SyncManager {
         return;
     }
 
-    console.log(`[SyncManager] Pushing ${queue.length} changes for user ${session.user.id}...`);
+        const actionPriority: Record<SyncQueue['action'], number> = {
+            create: 0,
+            update: 1,
+            delete: 2
+        };
+        const createTablePriority: Record<string, number> = {
+            profiles: 1,
+            foods: 2,
+            food_ingredients: 3,
+            goals: 4,
+            metrics: 4,
+            logs: 5,
+            activities: 5,
+            activity_logs: 6,
+            workout_exercises_def: 7,
+            workouts: 8,
+            workout_log_entries: 9,
+            workout_sets: 10
+        };
 
-    for (const item of queue) {
+        const sortedQueue = [...queue].sort((a, b) => {
+            const actionDiff = actionPriority[a.action] - actionPriority[b.action];
+            if (actionDiff !== 0) return actionDiff;
+
+            if (a.action === 'create' && b.action === 'create') {
+                const tableDiff = (createTablePriority[a.table] ?? 999) - (createTablePriority[b.table] ?? 999);
+                if (tableDiff !== 0) return tableDiff;
+            }
+
+            return a.created_at - b.created_at;
+        });
+
+        console.log(`[SyncManager] Pushing ${sortedQueue.length} changes for user ${session.user.id}...`);
+
+        let failedCount = 0;
+
+        for (const item of sortedQueue) {
       try {
         await this.processQueueItem(item, session);
         if (item.id) {
@@ -139,14 +211,90 @@ export class SyncManager {
         }
       } catch (error) {
         console.error('Failed to process queue item:', item, error);
-        // Break to avoid consistency issues if operations are dependent
-        break; 
+                failedCount += 1;
       }
     }
+
+        if (failedCount > 0) {
+            console.warn(`[SyncManager] ${failedCount} queue item(s) failed and were kept for retry`);
+        }
   }
+
+    private inferCanonicalMealType(value: string): string | null {
+        const normalized = value.trim().toLowerCase();
+        if (!normalized) return null;
+
+        const valid = new Set(['breakfast', 'lunch', 'dinner', 'snack', 'supplement']);
+        if (valid.has(normalized)) return normalized;
+
+        if (normalized.includes('break')) return 'breakfast';
+        if (normalized.includes('lunch')) return 'lunch';
+        if (normalized.includes('dinner') || normalized.includes('supper')) return 'dinner';
+        if (normalized.includes('supplement')) return 'supplement';
+        if (normalized.includes('snack')) return 'snack';
+        return null;
+    }
+
+    private buildMealAliases(value: string): string[] {
+        const normalized = value.trim().toLowerCase();
+        if (!normalized) return [];
+
+        const slug = normalized
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '');
+
+        const underscore = normalized.replace(/\s+/g, '_');
+        const dashed = normalized.replace(/\s+/g, '-');
+
+        return [...new Set([normalized, slug, underscore, dashed].filter(Boolean))];
+    }
+
+    private async normalizeDailyLogMealType(rawMealType: unknown): Promise<string> {
+        const value = String(rawMealType ?? '').trim().toLowerCase();
+
+        const inferred = this.inferCanonicalMealType(value);
+        if (inferred) return inferred;
+
+        const settings = await db.settings.get('local-settings');
+        const meals = Array.isArray((settings as any)?.meals) ? (settings as any).meals : [];
+
+        for (const meal of meals) {
+            const id = String(meal?.id ?? '');
+            const name = String(meal?.name ?? '');
+            const aliases = new Set([...this.buildMealAliases(id), ...this.buildMealAliases(name)]);
+
+            if (!aliases.has(value)) continue;
+
+            const nameMatch = this.inferCanonicalMealType(name);
+            if (nameMatch) return nameMatch;
+
+            const idMatch = this.inferCanonicalMealType(id);
+            if (idMatch) return idMatch;
+        }
+
+        return 'snack';
+    }
+
+    private getMissingColumnFromError(error: any): string | null {
+        if (error?.code !== 'PGRST204' || typeof error?.message !== 'string') return null;
+        const match = error.message.match(/Could not find the '([^']+)' column/);
+        return match?.[1] ?? null;
+    }
 
   private async processQueueItem(item: SyncQueue, session: any) {
     const { table, action, data } = item;
+        const tablesWithUserId = new Set([
+            'foods',
+            'logs',
+            'goals',
+            'metrics',
+            'activities',
+            'activity_logs',
+            'workout_exercises_def',
+            'workouts',
+            'workout_log_entries'
+        ]);
+        const supportsUserId = tablesWithUserId.has(table);
     
     // table mapping
     let supabaseTable = table;
@@ -170,9 +318,13 @@ export class SyncManager {
 
     // For create/update, we need to clean the data (remove local-only fields if any)
     const { synced, ...payload } = data;
+
+        if (!supportsUserId && 'user_id' in payload) {
+            delete payload.user_id;
+        }
     
     // override user_id with actual authenticated user id
-    if (session?.user?.id) {
+    if (session?.user?.id && supportsUserId) {
          if (payload.user_id === 'local-user' || payload.user_id === 'current-user' || !payload.user_id) {
              payload.user_id = session.user.id;
          }
@@ -191,27 +343,75 @@ export class SyncManager {
                  payload.user_id = session.user.id;
              }
          }
-    } else {
-        // If no session, we can't sync private data. 
-        // But we might be able to sync public data reading? 
-        // But pushing requires auth usually.
+    } else if (!session?.user?.id) {
         console.warn('[SyncManager] No session user, but sync was attempted.');
-        // If we throw here, we block the queue.
-        // Maybe we should just return and retry later?
-        // But pushChanges already checks for session.user.
     }
+
+        if (supabaseTable === 'daily_logs') {
+            payload.meal_type = await this.normalizeDailyLogMealType(payload.meal_type);
+        }
     
     console.log(`[SyncManager] Processing ${action} for ${supabaseTable} with user ${payload.user_id}`, payload);
 
+        const shouldRetryWithoutUserId = (error: any) => {
+      return (
+        supportsUserId &&
+        Object.prototype.hasOwnProperty.call(payload, 'user_id') &&
+        error?.code === 'PGRST204' &&
+        typeof error?.message === 'string' &&
+        error.message.includes("'user_id' column")
+      );
+    };
+
+        const executeCreate = async () => {
+            let { error } = await supabase.from(supabaseTable).insert(payload);
+
+            if (error && shouldRetryWithoutUserId(error)) {
+                console.warn(`[SyncManager] Retrying ${supabaseTable} insert without user_id due to schema mismatch`);
+                delete payload.user_id;
+                ({ error } = await supabase.from(supabaseTable).insert(payload));
+            }
+
+            let missingColumn = this.getMissingColumnFromError(error);
+            while (error && missingColumn && Object.prototype.hasOwnProperty.call(payload, missingColumn)) {
+                console.warn(`[SyncManager] Retrying ${supabaseTable} insert without missing column ${missingColumn}`);
+                delete payload[missingColumn];
+                ({ error } = await supabase.from(supabaseTable).insert(payload));
+                missingColumn = this.getMissingColumnFromError(error);
+            }
+
+            return error;
+        };
+
+        const executeUpdate = async () => {
+            let { error } = await supabase.from(supabaseTable).update(payload).eq('id', payload.id);
+
+            if (error && shouldRetryWithoutUserId(error)) {
+                console.warn(`[SyncManager] Retrying ${supabaseTable} update without user_id due to schema mismatch`);
+                delete payload.user_id;
+                ({ error } = await supabase.from(supabaseTable).update(payload).eq('id', payload.id));
+            }
+
+            let missingColumn = this.getMissingColumnFromError(error);
+            while (error && missingColumn && Object.prototype.hasOwnProperty.call(payload, missingColumn)) {
+                console.warn(`[SyncManager] Retrying ${supabaseTable} update without missing column ${missingColumn}`);
+                delete payload[missingColumn];
+                ({ error } = await supabase.from(supabaseTable).update(payload).eq('id', payload.id));
+                missingColumn = this.getMissingColumnFromError(error);
+            }
+
+            return error;
+        };
+
     if (action === 'create') {
-        const { error } = await supabase.from(supabaseTable).insert(payload);
+                const error = await executeCreate();
         if (error) { 
             console.error('[SyncManager] Insert error:', error);
             throw error; 
         }
     } else if (action === 'update') {
         if (!payload.id) throw new Error('No ID for update');
-        const { error } = await supabase.from(supabaseTable).update(payload).eq('id', payload.id);
+                const error = await executeUpdate();
         if (error) throw error;
     }
 
@@ -230,7 +430,8 @@ export class SyncManager {
   }
 
   async pullChanges(session: any) {
-    const lastSyncedAt = localStorage.getItem(LAST_SYNCED_KEY);
+        const lastSyncedKey = this.getLastSyncedKey(session);
+        const lastSyncedAt = localStorage.getItem(lastSyncedKey);
     let lastSyncedDate = lastSyncedAt || new Date(0).toISOString();
 
     // Track max timestamp globally for the sync cycle to ensure we don't miss updates
@@ -246,6 +447,7 @@ export class SyncManager {
     
     let maxTimestamp = lastSyncedDate;
     let hasChanges = false;
+    let hadPullErrors = false;
 
     // Tables to sync
     interface TableConfig {
@@ -327,6 +529,7 @@ export class SyncManager {
                 if (error && error.message && (error.message.includes('Load failed') || error.message.includes('Network request failed') || error.message.includes('fetch'))) {
                     throw error;
                 }
+                hadPullErrors = true;
                 fetchMore = false; // Stop fetching this table on error but maybe continue others? No, rethrow stopped it.
                 continue;
             }
@@ -359,15 +562,22 @@ export class SyncManager {
 
     // Only update timestamp if we successfully completed sync and processed changes
     // But even if no changes, we should update to now? No, update to maxTimestamp see
+    if (hadPullErrors) {
+        console.warn('[SyncManager] Pull completed with table errors. Keeping last sync cursor unchanged for retry.');
+        return;
+    }
+
+    await this.reconcileDeletedFoods();
+
     if (hasChanges && maxTimestamp > lastSyncedDate) {
-        localStorage.setItem(LAST_SYNCED_KEY, maxTimestamp); 
+        localStorage.setItem(lastSyncedKey, maxTimestamp); 
     } else if (!hasChanges) {
         // If no changes at all, we can update to now() only if we are sure we checked everything
         // But safely, let's just keep lastSyncedDate. 
         // Or update to now() to avoid checking old range repeatedly?
         // If we queried with gt(lastSyncedDate) and got 0 results, 
         // it means state IS synced up to now().
-        localStorage.setItem(LAST_SYNCED_KEY, new Date().toISOString());
+        localStorage.setItem(lastSyncedKey, new Date().toISOString());
     }
   }
 }

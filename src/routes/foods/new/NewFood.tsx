@@ -31,11 +31,43 @@ const ESSENTIAL_MINERAL_KEYS = [
   'Iodine'
 ] as const;
 
+const ESSENTIAL_VITAMIN_UNITS: Record<(typeof ESSENTIAL_VITAMIN_KEYS)[number], string> = {
+  'Vitamin A': 'mcg',
+  'Vitamin C': 'mg',
+  'Vitamin D': 'mcg',
+  'Vitamin E': 'mg',
+  'Vitamin B12': 'mcg',
+  'Vitamin B6': 'mg',
+  'Folate (B9)': 'mcg'
+};
+
+const ESSENTIAL_MINERAL_UNITS: Record<(typeof ESSENTIAL_MINERAL_KEYS)[number], string> = {
+  Calcium: 'mg',
+  Magnesium: 'mg',
+  Potassium: 'mg',
+  Zinc: 'mg',
+  Iron: 'mg',
+  Sodium: 'mg',
+  Iodine: 'mcg'
+};
+
 const REQUIRED_MICRO_KEYS = [
   ...ESSENTIAL_AMINO_ACIDS,
   ...ESSENTIAL_VITAMIN_KEYS,
   ...ESSENTIAL_MINERAL_KEYS
 ] as const;
+
+const EXACT_MICROS_KEYS_TEXT = [
+  'Histidine, Isoleucine, Leucine, Lysine, Methionine, Phenylalanine, Threonine, Tryptophan, Valine,',
+  'Vitamin A, Vitamin C, Vitamin D, Vitamin E, Vitamin B12, Vitamin B6, Folate (B9),',
+  'Calcium, Magnesium, Potassium, Zinc, Iron, Sodium, Iodine.'
+].join('\n');
+
+const MICROS_UNIT_CONTRACT_TEXT = [
+  '- Amino acids: grams (g)',
+  '- Vitamin A, Vitamin D, Vitamin B12, Folate (B9), Iodine: micrograms (mcg)',
+  '- Vitamin C, Vitamin E, Vitamin B6, Calcium, Magnesium, Potassium, Zinc, Iron, Sodium: milligrams (mg)'
+].join('\n');
 
 const KEY_ALIASES: Record<string, string[]> = {
   'Vitamin A': ['Vitamin A', 'vitamin_a', 'retinol', 'vitamin a rae'],
@@ -54,7 +86,31 @@ const KEY_ALIASES: Record<string, string[]> = {
   Iodine: ['Iodine']
 };
 
-const normalizeMicroKey = (value: string) => value.trim().toLowerCase().replace(/[_\s]+/g, ' ');
+const normalizeMicroKey = (value: string) =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b(mg|mcg|g|iu)\b/g, ' ')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const toNumericValue = (value: unknown): number => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const direct = Number(value);
+    if (Number.isFinite(direct)) return direct;
+
+    const match = value.match(/-?\d+(?:\.\d+)?/);
+    if (match) {
+      const parsed = Number(match[0]);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+  }
+  return 0;
+};
 
 const getMicroValue = (source: Record<string, unknown>, key: string): number => {
   const normalizedEntries = Object.entries(source).reduce<Record<string, unknown>>((acc, [rawKey, rawValue]) => {
@@ -65,11 +121,32 @@ const getMicroValue = (source: Record<string, unknown>, key: string): number => 
   const candidates = KEY_ALIASES[key] ?? [key];
   for (const candidate of candidates) {
     const value = normalizedEntries[normalizeMicroKey(candidate)];
-    const numericValue = typeof value === 'number' ? value : Number(value);
+    const numericValue = toNumericValue(value);
     if (Number.isFinite(numericValue)) return numericValue;
   }
 
   return 0;
+};
+
+const parseAiJsonFromText = (rawValue: string): Record<string, any> | null => {
+  const jsonMatch = rawValue.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) return null;
+
+  const candidate = jsonMatch[0];
+
+  try {
+    return JSON.parse(candidate);
+  } catch {
+    try {
+      const repaired = candidate
+        .replace(/[“”]/g, '"')
+        .replace(/[‘’]/g, "'")
+        .replace(/,\s*([}\]])/g, '$1');
+      return JSON.parse(repaired);
+    } catch {
+      return null;
+    }
+  }
 };
 
 
@@ -88,6 +165,7 @@ const CreateFood: React.FC = () => {
   const [fat, setFat] = useState<number>(0);
   const [micros, setMicros] = useState<Record<string, number>>({});
   const [aiInput, setAiInput] = useState('');
+  const [showAiPasteInput, setShowAiPasteInput] = useState(false);
 
 
   const [isFetching, setIsFetching] = useState(false);
@@ -108,12 +186,16 @@ const CreateFood: React.FC = () => {
 
       const prompt = `Act as a clinical nutrition database. Provide the full nutritional profile for "${name}" specifically for a serving size of ${servingSize}${servingUnit}.
     Return data ONLY as raw JSON with keys: "protein", "fat", "carbs", "calories", "micros".
-    For "micros", include ALL of the following keys even if unknown:
-    - Essential amino acids in grams: Histidine, Isoleucine, Leucine, Lysine, Methionine, Phenylalanine, Threonine, Tryptophan, Valine
-    - Essential vitamins: Vitamin A (mcg), Vitamin C (mg), Vitamin D (mcg), Vitamin E (mg), Vitamin B12 (mcg), Vitamin B6 (mg), Folate (B9) (mcg)
-    - Essential minerals: Calcium (mg), Magnesium (mg), Potassium (mg), Zinc (mg), Iron (mg), Sodium (mg), Iodine (mcg)
-    If any nutrient is not available for this food, set its value to 0.
-    All values must be numbers only. No markdown or prose.`;
+
+    EXACT_MICROS_KEYS:
+    ${EXACT_MICROS_KEYS_TEXT}
+
+    MICROS_UNIT_CONTRACT:
+    ${MICROS_UNIT_CONTRACT_TEXT}
+
+    Do not include units in keys or values.
+    If any nutrient is not available, set value to 0.
+    All values must be numeric (no strings, no units, no markdown, no prose, no extra keys).`;
 
       const result = await model.generateContent(prompt);
       const response = await result.response;
@@ -154,13 +236,17 @@ const CreateFood: React.FC = () => {
   const copyAIPrompt = () => {
     const foodTarget = name || "[INSERT FOOD NAME]";
     const prompt = `Act as a clinical nutrition database. Provide the full nutritional profile for "${foodTarget}" specifically for a serving size of ${servingSize}${servingUnit}.
-Return data ONLY as raw JSON with keys: "protein", "fat", "carbs", "calories", "micros".
-For "micros", include ALL of the following keys even if unknown:
-- Essential amino acids in grams: Histidine, Isoleucine, Leucine, Lysine, Methionine, Phenylalanine, Threonine, Tryptophan, Valine
-- Essential vitamins: Vitamin A (mcg), Vitamin C (mg), Vitamin D (mcg), Vitamin E (mg), Vitamin B12 (mcg), Vitamin B6 (mg), Folate (B9) (mcg)
-- Essential minerals: Calcium (mg), Magnesium (mg), Potassium (mg), Zinc (mg), Iron (mg), Sodium (mg), Iodine (mcg)
-If any nutrient is not available for this food, set its value to 0.
-All values must be numbers only. Do not include markdown or prose.`;
+  Return data ONLY as raw JSON with keys: "protein", "fat", "carbs", "calories", "micros".
+
+  EXACT_MICROS_KEYS:
+  ${EXACT_MICROS_KEYS_TEXT}
+
+  MICROS_UNIT_CONTRACT:
+  ${MICROS_UNIT_CONTRACT_TEXT}
+
+  Do not include units in keys or values.
+  If any nutrient is not available, set value to 0.
+  All values must be numeric (no strings, no units, no markdown, no prose, no extra keys).`;
     
     navigator.clipboard.writeText(prompt);
     alert(`Prompt for ${servingSize}${servingUnit} copied!`);
@@ -171,9 +257,8 @@ All values must be numbers only. Do not include markdown or prose.`;
     setAiInput(rawValue);
 
     try {
-      const jsonMatch = rawValue.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) return;
-      const data = JSON.parse(jsonMatch[0]);
+      const data = parseAiJsonFromText(rawValue);
+      if (!data) return;
 
       if (data.protein !== undefined) setProtein(data.protein);
       if (data.carbs !== undefined) setCarbs(data.carbs);
@@ -183,9 +268,22 @@ All values must be numbers only. Do not include markdown or prose.`;
         REQUIRED_MICRO_KEYS.forEach((microKey) => {
           cleanMicros[microKey] = getMicroValue(data.micros, microKey);
         });
+
+        Object.entries(data.micros).forEach(([rawKey, rawValue]) => {
+          const normalized = normalizeMicroKey(rawKey);
+          const mappedKey = REQUIRED_MICRO_KEYS.find(
+            (microKey) =>
+              normalizeMicroKey(microKey) === normalized ||
+              (KEY_ALIASES[microKey] || []).some((alias) => normalizeMicroKey(alias) === normalized)
+          );
+
+          if (mappedKey) {
+            cleanMicros[mappedKey] = toNumericValue(rawValue);
+          }
+        });
+
         setMicros(cleanMicros);
       }
-      setAiInput(''); // Clear after successful parse
     } catch (err) {
       console.error("Parse error", err);
     }
@@ -237,12 +335,25 @@ All values must be numbers only. Do not include markdown or prose.`;
         <label className="block text-[10px] font-bold text-text-muted uppercase tracking-widest mb-2">
           AI Data Importer
         </label>
-        <textarea
-          value={aiInput}
-          onChange={handleAiPaste}
-          placeholder="Paste AI response here to auto-fill everything..."
-          className="w-full h-12 p-2 text-sm border border-border-subtle rounded-lg focus:ring-2 focus:ring-brand focus:outline-none bg-card placeholder:text-text-muted"
-        />
+        {!showAiPasteInput ? (
+          <button
+            type="button"
+            onClick={() => {
+              copyAIPrompt();
+              setShowAiPasteInput(true);
+            }}
+            className="w-full p-3 text-sm font-bold border border-border-subtle rounded-lg bg-card text-text-main hover:bg-brand hover:text-brand-fg hover:border-brand transition-colors"
+          >
+            Copy Prompt
+          </button>
+        ) : (
+          <textarea
+            value={aiInput}
+            onChange={handleAiPaste}
+            placeholder="Paste AI response here to auto-fill everything..."
+            className="w-full h-24 p-2 text-sm border border-border-subtle rounded-lg focus:ring-2 focus:ring-brand focus:outline-none bg-card placeholder:text-text-muted"
+          />
+        )}
       </div>
 
       <form onSubmit={(e) => e.preventDefault()} className="space-y-6">
@@ -300,32 +411,82 @@ All values must be numbers only. Do not include markdown or prose.`;
         </div>
 
         {/* Detailed Micros */}
-        <details className="group border border-border-subtle rounded-xl overflow-hidden shadow-sm">
-          <summary className="p-4 bg-card cursor-pointer hover:bg-surface flex justify-between items-center select-none">
-            <div className="flex items-center gap-2">
-              <span className="text-brand text-lg">🧬</span>
-              <span className="font-bold text-sm text-text-main">Essential Amino Acids</span>
-            </div>
-            <span className="group-open:rotate-180 transition-transform text-text-muted">▼</span>
-          </summary>
-          <div className="p-4 grid grid-cols-2 gap-x-6 gap-y-3 bg-surface">
-            {ESSENTIAL_AMINO_ACIDS.map((amino) => (
-              <div key={amino} className="flex flex-col">
-                <label className="text-[10px] font-bold text-text-muted uppercase mb-1">{amino}</label>
-                <div className="relative">
-                  <input 
-                    type="number" 
-                    step="any"
-                    value={micros[amino] || ''} 
-                    onChange={(e) => setMicros(p => ({ ...p, [amino]: parseFloat(e.target.value) || 0 }))}
-                    className="w-full p-2 pr-6 text-sm border border-border-subtle rounded-lg focus:ring-1 focus:ring-brand outline-none bg-card text-text-main" 
-                  />
-                  <span className="absolute right-2 top-2 text-[10px] text-text-muted">g</span>
-                </div>
+        <div className="space-y-4">
+          <details className="group border border-border-subtle rounded-xl overflow-hidden shadow-sm">
+            <summary className="p-4 bg-card cursor-pointer hover:bg-surface flex items-center justify-between select-none">
+              <div className="flex items-center gap-2">
+                <span className="text-brand text-lg">🧬</span>
+                <span className="font-bold text-sm text-text-main">Essential Amino Acids</span>
               </div>
-            ))}
-          </div>
-        </details>
+              <span className="text-text-muted group-open:rotate-180 transition-transform">▼</span>
+            </summary>
+            <div className="p-4 grid grid-cols-2 gap-x-6 gap-y-3 bg-surface border-t border-border-subtle">
+              {ESSENTIAL_AMINO_ACIDS.map((amino) => (
+                <div key={amino} className="flex flex-col">
+                  <label className="text-[10px] font-bold text-text-muted uppercase mb-1">{amino}</label>
+                  <div className="relative">
+                    <input 
+                      type="number" 
+                      step="any"
+                      value={micros[amino] ?? ''} 
+                      onChange={(e) => setMicros(p => ({ ...p, [amino]: parseFloat(e.target.value) || 0 }))}
+                      className="w-full p-2 pr-8 text-sm border border-border-subtle rounded-lg focus:ring-1 focus:ring-brand outline-none bg-card text-text-main" 
+                    />
+                    <span className="absolute right-2 top-2 text-[10px] text-text-muted">g</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </details>
+
+          <details className="group border border-border-subtle rounded-xl overflow-hidden shadow-sm">
+            <summary className="p-4 bg-card cursor-pointer hover:bg-surface flex items-center justify-between select-none">
+              <span className="font-bold text-sm text-text-main">Essential Vitamins</span>
+              <span className="text-text-muted group-open:rotate-180 transition-transform">▼</span>
+            </summary>
+            <div className="p-4 grid grid-cols-2 gap-x-6 gap-y-3 bg-surface border-t border-border-subtle">
+              {ESSENTIAL_VITAMIN_KEYS.map((vitamin) => (
+                <div key={vitamin} className="flex flex-col">
+                  <label className="text-[10px] font-bold text-text-muted uppercase mb-1">{vitamin}</label>
+                  <div className="relative">
+                    <input 
+                      type="number" 
+                      step="any"
+                      value={micros[vitamin] ?? ''} 
+                      onChange={(e) => setMicros(p => ({ ...p, [vitamin]: parseFloat(e.target.value) || 0 }))}
+                      className="w-full p-2 pr-10 text-sm border border-border-subtle rounded-lg focus:ring-1 focus:ring-brand outline-none bg-card text-text-main" 
+                    />
+                    <span className="absolute right-2 top-2 text-[10px] text-text-muted">{ESSENTIAL_VITAMIN_UNITS[vitamin]}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </details>
+
+          <details className="group border border-border-subtle rounded-xl overflow-hidden shadow-sm">
+            <summary className="p-4 bg-card cursor-pointer hover:bg-surface flex items-center justify-between select-none">
+              <span className="font-bold text-sm text-text-main">Essential Minerals</span>
+              <span className="text-text-muted group-open:rotate-180 transition-transform">▼</span>
+            </summary>
+            <div className="p-4 grid grid-cols-2 gap-x-6 gap-y-3 bg-surface border-t border-border-subtle">
+              {ESSENTIAL_MINERAL_KEYS.map((mineral) => (
+                <div key={mineral} className="flex flex-col">
+                  <label className="text-[10px] font-bold text-text-muted uppercase mb-1">{mineral}</label>
+                  <div className="relative">
+                    <input 
+                      type="number" 
+                      step="any"
+                      value={micros[mineral] ?? ''} 
+                      onChange={(e) => setMicros(p => ({ ...p, [mineral]: parseFloat(e.target.value) || 0 }))}
+                      className="w-full p-2 pr-10 text-sm border border-border-subtle rounded-lg focus:ring-1 focus:ring-brand outline-none bg-card text-text-main" 
+                    />
+                    <span className="absolute right-2 top-2 text-[10px] text-text-muted">{ESSENTIAL_MINERAL_UNITS[mineral]}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </details>
+        </div>
 
         {/* Actions */}
         <div className="flex gap-3 pt-4">

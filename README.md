@@ -43,9 +43,21 @@ Configure the environment variables to connect your app to Supabase.
     ```env
     VITE_SUPABASE_URL=your_supabase_project_url
     VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-    VITE_GEMINI_API_KEY=your_gemini_api_key
     ```
-    You can find Supabase values in your Supabase project settings under **API**. Generate your Gemini key in Google AI Studio.
+    You can find Supabase values in your Supabase project settings under **API**.
+
+3.  Configure Gemini secrets in Supabase Edge Functions (server-side only):
+    ```bash
+    supabase secrets set GEMINI_API_KEY=your_gemini_api_key
+    supabase secrets set GEMINI_MODEL=gemini-2.5-flash
+    ```
+
+4.  Deploy the function used by the app:
+    ```bash
+    supabase functions deploy gemini-food-nutrition
+    ```
+
+Do not expose Gemini keys in `VITE_*` variables for static hosting.
 
 ## Running the App
 

@@ -7,6 +7,53 @@ import { generateId } from '../../../lib';
 
 const WEIGHT_BASED_REGEX = /^(g|ml|oz)$/i;
 
+const EAA_GROUP_LABELS: Record<EaaRatioGroupKey, string> = {
+  leucine: 'Leucine',
+  lysine: 'Lysine',
+  valineIsoleucine: 'Valine + Isoleucine',
+  rest: 'Other EAAs'
+};
+
+const EAA_GROUP_SHORT_LABELS: Record<EaaRatioGroupKey, string> = {
+  leucine: 'Leucine',
+  lysine: 'Lysine',
+  valineIsoleucine: 'Val+Iso',
+  rest: 'Rest EAAs'
+};
+
+const MICRONUTRIENT_META = [
+  { key: 'vitamin_a', label: 'Vitamin A', unit: 'mcg', aliases: ['vitamin a', 'retinol', 'vitamin a rae'] },
+  { key: 'vitamin_c', label: 'Vitamin C', unit: 'mg', aliases: ['vitamin c', 'ascorbic acid'] },
+  { key: 'vitamin_d', label: 'Vitamin D', unit: 'mcg', aliases: ['vitamin d', 'vitamin d3', 'cholecalciferol'] },
+  { key: 'vitamin_e', label: 'Vitamin E', unit: 'mg', aliases: ['vitamin e', 'alpha tocopherol', 'tocopherol'] },
+  { key: 'vitamin_b12', label: 'Vitamin B12', unit: 'mcg', aliases: ['vitamin b12', 'b12', 'cobalamin'] },
+  { key: 'vitamin_b6', label: 'Vitamin B6', unit: 'mg', aliases: ['vitamin b6', 'b6', 'pyridoxine'] },
+  { key: 'folate_b9', label: 'Folate (B9)', unit: 'mcg', aliases: ['folate', 'vitamin b9', 'folic acid', 'b9'] },
+  { key: 'calcium', label: 'Calcium', unit: 'mg', aliases: ['calcium'] },
+  { key: 'magnesium', label: 'Magnesium', unit: 'mg', aliases: ['magnesium'] },
+  { key: 'potassium', label: 'Potassium', unit: 'mg', aliases: ['potassium'] },
+  { key: 'zinc', label: 'Zinc', unit: 'mg', aliases: ['zinc'] },
+  { key: 'iron', label: 'Iron', unit: 'mg', aliases: ['iron'] },
+  { key: 'sodium', label: 'Sodium', unit: 'mg', aliases: ['sodium', 'na'] },
+  { key: 'iodine', label: 'Iodine', unit: 'mcg', aliases: ['iodine'] }
+] as const;
+
+function normalizeMicroKey(value: string): string {
+  return value.trim().toLowerCase().replace(/[_\s-]+/g, '');
+}
+
+function formatNutrientValue(value: number): string {
+  return value >= 100 ? String(Math.round(value)) : String(Math.round(value * 10) / 10);
+}
+
+function joinEaaGroupLabels(
+  groups: EaaRatioGroupKey[],
+  labels: Record<EaaRatioGroupKey, string> = EAA_GROUP_LABELS
+): string {
+  if (!groups.length) return 'Balanced';
+  return groups.map((group) => labels[group]).join(' + ');
+}
+
 function formatServingLabel(food: Food): string {
   const unit = (food.serving_unit || '').trim();
   const size = food.serving_size;
@@ -43,6 +90,27 @@ export default function AddLogEntry() {
   const [sortMode, setSortMode] = useState<'default' | 'eaa-gap'>('default');
 
   const settingsRow = useLiveQuery(async () => db.settings.get('local-settings'), []);
+
+  const mealLogs = useLiveQuery(async () => {
+    const normalizedMealType = mealType.trim().toLowerCase();
+    const dayLogs = await db.logs.where('date').equals(date).toArray();
+    return dayLogs.filter((log) => String(log.meal_type || '').trim().toLowerCase() === normalizedMealType);
+  }, [date, mealType]);
+
+  const mealLogIdsByFood = useMemo(() => {
+    const logs = [...(mealLogs || [])].sort((a, b) => {
+      const aTs = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const bTs = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return bTs - aTs;
+    });
+
+    return logs.reduce<Map<string, string[]>>((acc, log) => {
+      const ids = acc.get(log.food_id) || [];
+      ids.push(log.id);
+      acc.set(log.food_id, ids);
+      return acc;
+    }, new Map());
+  }, [mealLogs]);
 
   const mealLabel = useMemo(() => {
     const normalizedMealType = mealType.trim().toLowerCase();
@@ -138,6 +206,22 @@ export default function AddLogEntry() {
     ).deficitByGroup;
   }, [dayNutritionContext]);
 
+  const eaaDeficitTargeting = useMemo(() => {
+    const ranked = (Object.entries(eaaDeficit) as Array<[EaaRatioGroupKey, number]>)
+      .filter(([, grams]) => grams > 0)
+      .sort((a, b) => b[1] - a[1]);
+
+    const targetedGroups = ranked.slice(0, 2).map(([group]) => group);
+    const totalDeficit = ranked.reduce((sum, [, grams]) => sum + grams, 0);
+
+    return {
+      ranked,
+      targetedGroups,
+      totalDeficit,
+      summaryLabel: joinEaaGroupLabels(targetedGroups, EAA_GROUP_SHORT_LABELS)
+    };
+  }, [eaaDeficit]);
+
   const rankedSearchResults = useMemo(() => {
     if (!searchResults) return [];
     if (sortMode === 'default') {
@@ -167,6 +251,72 @@ export default function AddLogEntry() {
       });
   }, [searchResults, sortMode, eaaDeficit]);
 
+  const eaaGuidance = useMemo(() => {
+    if (!selectedFood) {
+      return {
+        targetedDeficitsText: 'No active EAA deficits for today.',
+        helpsText: 'Select a food to see EAA guidance.',
+        replacementText: 'Select a food to compare alternatives.'
+      };
+    }
+
+    const guidanceQuantity = selectedUnit === 'serving'
+      ? inputValue
+      : (() => {
+          const size = selectedFood.serving_size || 1;
+          return size > 0 ? inputValue / size : inputValue;
+        })();
+
+    const selectedScore = scoreFoodForEaaDeficit(selectedFood.micros, eaaDeficit, guidanceQuantity);
+
+    const helpedGroups = (Object.entries(selectedScore.filledByGroup) as Array<[EaaRatioGroupKey, number]>)
+      .filter(([, grams]) => grams > 0)
+      .sort((a, b) => b[1] - a[1]);
+
+    const targetedDeficitsText = eaaDeficitTargeting.ranked.length
+      ? eaaDeficitTargeting.ranked
+          .slice(0, 2)
+          .map(([group, grams]) => `${EAA_GROUP_LABELS[group]} (${formatNutrientValue(grams)}g)`)
+          .join(' • ')
+      : 'No meaningful EAA deficit detected today.';
+
+    const helpsText = helpedGroups.length
+      ? helpedGroups
+          .slice(0, 2)
+          .map(([group, grams]) => `${EAA_GROUP_LABELS[group]} +${formatNutrientValue(grams)}g`)
+          .join(' • ')
+      : 'This food does not materially close current EAA deficits at this amount.';
+
+    const bestAlternative = [...(searchResults || [])]
+      .filter((food) => food.id !== selectedFood.id)
+      .map((food) => {
+        const scoreData = scoreFoodForEaaDeficit(food.micros, eaaDeficit, guidanceQuantity);
+        const bestGroup = (Object.entries(scoreData.filledByGroup) as Array<[EaaRatioGroupKey, number]>)
+          .sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+        return {
+          food,
+          score: scoreData.score,
+          bestGroup
+        };
+      })
+      .sort((a, b) => b.score - a.score)[0];
+
+    const replacementText =
+      eaaDeficitTargeting.totalDeficit <= 0
+        ? 'No swap needed. Today looks balanced for EAAs.'
+        : selectedScore.score <= 0 && (!bestAlternative || bestAlternative.score <= 0)
+          ? 'Not enough EAA data to suggest a better replacement.'
+          : bestAlternative && bestAlternative.score > selectedScore.score + 0.05
+            ? `Consider ${bestAlternative.food.name} for stronger ${bestAlternative.bestGroup ? EAA_GROUP_LABELS[bestAlternative.bestGroup] : 'EAA'} support (+${formatNutrientValue(bestAlternative.score - selectedScore.score)}g).`
+            : 'Current food is already a solid match for today’s EAA targets.';
+
+    return {
+      targetedDeficitsText,
+      helpsText,
+      replacementText
+    };
+  }, [selectedFood, selectedUnit, inputValue, eaaDeficit, eaaDeficitTargeting, searchResults]);
+
   // --- Calculations (Derived State) ---
   const isWeightBased = useMemo(() => 
     !!(selectedFood?.serving_unit && WEIGHT_BASED_REGEX.test(selectedFood.serving_unit)), 
@@ -186,6 +336,108 @@ export default function AddLogEntry() {
     carbs: selectedFood ? (selectedFood.carbs * quantity).toFixed(1) : 0,
     fat: selectedFood ? (selectedFood.fat * quantity).toFixed(1) : 0,
   }), [selectedFood, quantity]);
+
+  const selectedFoodEaaQuality = useMemo(() => {
+    if (!selectedFood) {
+      return {
+        eaaPercent: 0,
+        eaaTotal: 0,
+        proteinTotal: 0,
+        label: 'No data',
+        coveragePercent: 0,
+        groups: {
+          leucine: 0,
+          lysine: 0,
+          valineIsoleucine: 0,
+          rest: 0
+        },
+        targetByCurrentTotal: {
+          leucine: 0,
+          lysine: 0,
+          valineIsoleucine: 0,
+          rest: 0
+        }
+      };
+    }
+
+    const analysis = analyzeEaaRatio([
+      {
+        proteinGrams: Number(selectedFood.protein) || 0,
+        amountConsumed: Number(quantity) || 0,
+        micros: selectedFood.micros
+      }
+    ]);
+
+    const percent = analysis.eaaAsProteinPercent;
+    const label = percent >= 35 ? 'Excellent' : percent >= 25 ? 'Good' : percent > 0 ? 'Fair' : 'No data';
+
+    return {
+      eaaPercent: percent,
+      eaaTotal: analysis.eaaTotal,
+      proteinTotal: analysis.proteinTotal,
+      label,
+      coveragePercent: analysis.proteinTotal > 0 ? (analysis.proteinWithEaaData / analysis.proteinTotal) * 100 : 0,
+      groups: analysis.groups,
+      targetByCurrentTotal: analysis.targetByCurrentTotal
+    };
+  }, [selectedFood, quantity]);
+
+  const eaaGroupDetails = useMemo(
+    () => [
+      {
+        key: 'leucine',
+        label: 'Leucine',
+        value: selectedFoodEaaQuality.groups.leucine,
+        target: selectedFoodEaaQuality.targetByCurrentTotal.leucine
+      },
+      {
+        key: 'lysine',
+        label: 'Lysine',
+        value: selectedFoodEaaQuality.groups.lysine,
+        target: selectedFoodEaaQuality.targetByCurrentTotal.lysine
+      },
+      {
+        key: 'valineIsoleucine',
+        label: 'Valine + Isoleucine',
+        value: selectedFoodEaaQuality.groups.valineIsoleucine,
+        target: selectedFoodEaaQuality.targetByCurrentTotal.valineIsoleucine
+      },
+      {
+        key: 'rest',
+        label: 'Other EAAs',
+        value: selectedFoodEaaQuality.groups.rest,
+        target: selectedFoodEaaQuality.targetByCurrentTotal.rest
+      }
+    ],
+    [selectedFoodEaaQuality]
+  );
+
+  const selectedFoodMicros = useMemo(() => {
+    if (!selectedFood?.micros) return [] as Array<{ key: string; label: string; unit: string; value: number }>;
+
+    const normalizedSource = Object.entries(selectedFood.micros).reduce<Record<string, number>>((acc, [key, value]) => {
+      const amount = Number(value);
+      if (!Number.isFinite(amount) || amount <= 0) return acc;
+      const normalized = normalizeMicroKey(key);
+      acc[normalized] = (acc[normalized] || 0) + amount;
+      return acc;
+    }, {});
+
+    return MICRONUTRIENT_META
+      .map((nutrient) => {
+        const aliases = [nutrient.key, ...nutrient.aliases].map(normalizeMicroKey);
+        const baseValue = aliases.reduce((sum, alias) => sum + (normalizedSource[alias] || 0), 0);
+        const value = baseValue * quantity;
+        return {
+          key: nutrient.key,
+          label: nutrient.label,
+          unit: nutrient.unit,
+          value
+        };
+      })
+      .filter((item) => item.value > 0)
+      .sort((a, b) => b.value - a.value);
+  }, [selectedFood, quantity]);
 
   // --- Handlers ---
   const handleSelectFood = (food: Food) => {
@@ -250,6 +502,37 @@ export default function AddLogEntry() {
     }
   };
 
+  const toggleFoodInMeal = async (food: Food) => {
+    try {
+      const existingIds = mealLogIdsByFood.get(food.id) || [];
+      const mostRecentLogId = existingIds[0];
+
+      if (mostRecentLogId) {
+        await db.logs.delete(mostRecentLogId);
+        setAddedFoodIds((ids) => ids.filter((id) => id !== food.id));
+        setAddedCount((count) => Math.max(0, count - 1));
+        return;
+      }
+
+      await db.logs.add({
+        id: generateId(),
+        user_id: 'local-user',
+        date,
+        meal_type: mealType,
+        food_id: food.id,
+        amount_consumed: 1,
+        synced: 0,
+        created_at: new Date()
+      });
+
+      setAddedCount((count) => count + 1);
+      setAddedFoodIds((ids) => (ids.includes(food.id) ? ids : [...ids, food.id]));
+    } catch (error) {
+      console.error('Failed to toggle quick meal item:', error);
+      alert('Failed to update meal item');
+    }
+  };
+
   return (
     <div className="container mx-auto p-4 max-w-md pb-24">
       <div className="flex items-center mb-4">
@@ -299,7 +582,7 @@ export default function AddLogEntry() {
           </div>
           <div className="space-y-2">
             {rankedSearchResults?.map(({ food, score, bestGroup }) => {
-              const alreadyAdded = addedFoodIds.includes(food.id);
+              const alreadyAdded = mealLogIdsByFood.has(food.id) || addedFoodIds.includes(food.id);
 
               const bestGroupLabel =
                 bestGroup === 'leucine'
@@ -313,10 +596,10 @@ export default function AddLogEntry() {
                         : null;
 
               return (
-                <button
+                <div
                   key={food.id}
                   onClick={() => handleSelectFood(food)}
-                  className="w-full text-left p-4 bg-card border border-border-subtle rounded-lg shadow-sm hover:bg-surface transition-colors flex justify-between items-center"
+                  className="w-full text-left p-4 bg-card border border-border-subtle rounded-lg shadow-sm hover:bg-surface transition-colors flex justify-between items-center cursor-pointer"
                 >
                   <div>
                     <div className="font-bold text-lg text-text-main">{food.name}</div>
@@ -336,12 +619,19 @@ export default function AddLogEntry() {
                       fat={food.fat}
                     />
                   </div>
-                  {alreadyAdded ? (
-                    <div className="w-8 h-8 rounded-full bg-green-500 text-white text-lg font-black flex items-center justify-center">✓</div>
-                  ) : (
-                    <div className="w-8 h-8 rounded-full bg-brand text-brand-fg text-2xl flex items-center justify-center">+</div>
-                  )}
-                </button>
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void toggleFoodInMeal(food);
+                    }}
+                    className={`w-8 h-8 rounded-full text-2xl flex items-center justify-center ${alreadyAdded ? 'bg-green-500 text-white text-lg font-black' : 'bg-brand text-brand-fg'}`}
+                    aria-label={alreadyAdded ? `Remove ${food.name} from meal` : `Add ${food.name} to meal`}
+                    title={alreadyAdded ? 'Remove from meal' : 'Add to meal'}
+                  >
+                    {alreadyAdded ? '−' : '+'}
+                  </button>
+                </div>
               );
             }) || <div className="text-center text-text-muted mt-8 italic">Start typing to search...</div>}
           </div>
@@ -425,6 +715,86 @@ export default function AddLogEntry() {
               </button>
             </div>
           )}
+
+          <div className="mt-4 mb-3 bg-surface border border-border-subtle rounded-lg p-3">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <p className="text-xs font-bold text-text-main">EAA Group Breakdown</p>
+              <span className="text-[11px] text-text-muted">consumed / target</span>
+            </div>
+            <div className="bg-card border border-border-subtle rounded-lg p-2.5 mb-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-bold text-text-main">EAA Quality</p>
+                <span className="text-[11px] font-bold text-brand bg-surface border border-border-subtle px-2 py-0.5 rounded-full">
+                  {selectedFoodEaaQuality.label}
+                </span>
+              </div>
+              <p className="mt-1 text-sm font-semibold text-text-main">
+                {selectedFoodEaaQuality.eaaPercent > 0
+                  ? `${formatNutrientValue(selectedFoodEaaQuality.eaaPercent)}% EAA-to-protein`
+                  : 'No amino data'}
+              </p>
+              <p className="text-[11px] text-text-muted mt-1">
+                {formatNutrientValue(selectedFoodEaaQuality.eaaTotal)}g EAA / {formatNutrientValue(selectedFoodEaaQuality.proteinTotal)}g protein
+              </p>
+              <p className="text-[11px] text-text-muted">
+                Coverage {formatNutrientValue(selectedFoodEaaQuality.coveragePercent)}%
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              {eaaGroupDetails.map((item) => (
+                <div key={item.key} className="text-xs">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-text-muted">{item.label}</span>
+                    <span className="font-semibold text-text-main">
+                      {formatNutrientValue(item.value)}g / {formatNutrientValue(item.target)}g
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="mb-3 bg-surface border border-border-subtle rounded-lg p-3">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <p className="text-xs font-bold text-text-main">EAA Guidance</p>
+              <span className="text-[11px] text-text-muted">{eaaDeficitTargeting.summaryLabel}</span>
+            </div>
+            <div className="space-y-2 text-xs">
+              <div>
+                <p className="text-text-muted">Targeted today</p>
+                <p className="font-semibold text-text-main">{eaaGuidance.targetedDeficitsText}</p>
+              </div>
+              <div>
+                <p className="text-text-muted">How this food helps</p>
+                <p className="font-semibold text-text-main">{eaaGuidance.helpsText}</p>
+              </div>
+              <div>
+                <p className="text-text-muted">Replace?</p>
+                <p className="font-semibold text-text-main">{eaaGuidance.replacementText}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-surface border border-border-subtle rounded-lg p-3">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <p className="text-xs font-bold text-text-main">Micronutrient Breakdown</p>
+              <span className="text-[11px] text-text-muted">per selected amount</span>
+            </div>
+            {selectedFoodMicros.length > 0 ? (
+              <div className="space-y-1.5 max-h-40 overflow-auto pr-1">
+                {selectedFoodMicros.map((item) => (
+                  <div key={item.key} className="flex items-center justify-between text-xs">
+                    <span className="text-text-muted">{item.label}</span>
+                    <span className="font-semibold text-text-main">
+                      {formatNutrientValue(item.value)} {item.unit}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-text-muted">No micronutrient data available for this food.</p>
+            )}
+          </div>
         </div>
       )}
     </div>
