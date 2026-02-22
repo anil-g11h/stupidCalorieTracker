@@ -1,0 +1,1132 @@
+{
+  "generatedAt": "2026-02-22T03:58:04.990706Z",
+  "baseUrlPrefix": "workouts",
+  "counts": {
+    "videos": 72,
+    "images": 22,
+    "audio": 0
+  },
+  "media": [
+    {
+      "sourceId": "00251201",
+      "videoPath": "workouts/videos/00251201-barbell-bench-press-chest.mp4",
+      "thumbnailPath": "workouts/images/00251201-barbell-bench-press-chest-thumb.jpg"
+    },
+    {
+      "sourceId": "00301201",
+      "videoPath": "workouts/videos/00301201-barbell-close-grip-bench-press-upper-arms.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "00311201",
+      "videoPath": "workouts/videos/00311201-barbell-curl-upper-arms.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "00321201",
+      "videoPath": "workouts/videos/00321201-barbell-deadlift-hips-fix.mp4",
+      "thumbnailPath": "workouts/images/00321201-barbell-deadlift-hips-fix-thumb.jpg"
+    },
+    {
+      "sourceId": "00331201",
+      "videoPath": "workouts/videos/00331201-barbell-decline-bench-press-chest.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "00431201",
+      "videoPath": "workouts/videos/00431201-barbell-full-squat-thighs.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "00441201",
+      "videoPath": "workouts/videos/00441201-barbell-good-morning-thighs.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "00471201",
+      "videoPath": "workouts/videos/00471201-barbell-incline-bench-press-chest.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "00601201",
+      "videoPath": "workouts/videos/00601201-barbell-lying-triceps-extension-skull-crusher-upper-arms.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "00851201",
+      "videoPath": "workouts/videos/00851201-barbell-romanian-deadlift-hips-fix.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "01211201",
+      "videoPath": "workouts/videos/01211201-barbell-upright-row-shoulders.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "01501201",
+      "videoPath": "workouts/videos/01501201-cable-bar-lateral-pulldown-back.mp4",
+      "thumbnailPath": "workouts/images/01501201-cable-bar-lateral-pulldown-back-thumb.jpg"
+    },
+    {
+      "sourceId": "01511201",
+      "videoPath": "workouts/videos/01511201-cable-bench-press-chest.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "01621201",
+      "videoPath": "workouts/videos/01621201-cable-front-raise-shoulders.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "01781201",
+      "videoPath": "workouts/videos/01781201-cable-lateral-raise-shoulder.mp4",
+      "thumbnailPath": "workouts/images/01781201-cable-lateral-raise-shoulder-thumb.jpg"
+    },
+    {
+      "sourceId": "01801201",
+      "videoPath": "workouts/videos/01801201-cable-low-seated-row-back.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "02011201",
+      "videoPath": "workouts/videos/02011201-cable-pushdown-upper-arms.mp4",
+      "thumbnailPath": "workouts/images/02011201-cable-pushdown-upper-arms-thumb.jpg"
+    },
+    {
+      "sourceId": "02081201",
+      "videoPath": "workouts/videos/02081201-cable-reverse-grip-straight-back-seated-high-row-back.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "02381201",
+      "videoPath": "workouts/videos/02381201-cable-straight-arm-pulldown-back.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "02831201",
+      "videoPath": "workouts/videos/02831201-diamond-push-up-upper-arms.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "02871201",
+      "videoPath": "workouts/videos/02871201-dumbbell-arnold-press-ii-shoulders.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "02891201",
+      "videoPath": "workouts/videos/02891201-dumbbell-bench-press-chest.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "02921201",
+      "videoPath": "workouts/videos/02921201-dumbbell-bent-over-row-back.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "02931201",
+      "videoPath": "workouts/videos/02931201-dumbbell-bent-over-row-back.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "02941201",
+      "videoPath": "workouts/videos/02941201-dumbbell-biceps-curl-upper-arms.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "03101201",
+      "videoPath": "workouts/videos/03101201-dumbbell-front-raise-shoulders.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "03121201",
+      "videoPath": "workouts/videos/03121201-dumbbell-hammer-curl-upper-arms.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "03141201",
+      "videoPath": "workouts/videos/03141201-dumbbell-incline-bench-press-chest.mp4",
+      "thumbnailPath": "workouts/images/03141201-dumbbell-incline-bench-press-chest-thumb.jpg"
+    },
+    {
+      "sourceId": "03331201",
+      "videoPath": "workouts/videos/03331201-dumbbell-kickback-upper-arms.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "03341201",
+      "videoPath": "workouts/videos/03341201-dumbbell-lateral-raise-shoulder.mp4",
+      "thumbnailPath": "workouts/images/03341201-dumbbell-lateral-raise-shoulder-thumb.jpg"
+    },
+    {
+      "sourceId": "03621201",
+      "videoPath": "workouts/videos/03621201-dumbbell-one-arm-triceps-extension-on-bench-upper-arms.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "03831201",
+      "videoPath": "workouts/videos/03831201-dumbbell-reverse-fly-shoulders.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "04051201",
+      "videoPath": "workouts/videos/04051201-dumbbell-seated-shoulder-press-shoulders.mp4",
+      "thumbnailPath": "workouts/images/04051201-dumbbell-seated-shoulder-press-shoulders-thumb.jpg"
+    },
+    {
+      "sourceId": "04061201",
+      "videoPath": "workouts/videos/04061201-dumbbell-shrug-back.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "04071201",
+      "videoPath": "workouts/videos/04071201-dumbbell-side-bend-waist.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "04131201",
+      "videoPath": "workouts/videos/04131201-dumbbell-squat-hips.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "04261201",
+      "videoPath": "workouts/videos/04261201-dumbbell-standing-overhead-press-shoulder.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "04301201",
+      "videoPath": "workouts/videos/04301201-dumbbell-standing-triceps-extension-upper-arms.mp4",
+      "thumbnailPath": "workouts/images/04301201-dumbbell-standing-triceps-extension-upper-arms-thumb.jpg"
+    },
+    {
+      "sourceId": "04661201",
+      "videoPath": "workouts/videos/04661201-sternum-pull-up-gironda-back.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "05721201",
+      "videoPath": "workouts/videos/05721201-lever-assisted-chin-up-back.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "05761201",
+      "videoPath": "workouts/videos/05761201-lever-chest-press-plate-loaded-chest.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "05771201",
+      "videoPath": "workouts/videos/05771201-lever-chest-press-chest.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "05791201",
+      "videoPath": "workouts/videos/05791201-lever-front-pulldown-back.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "05851201",
+      "videoPath": "workouts/videos/05851201-lever-leg-extension-thighs.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "05861201",
+      "videoPath": "workouts/videos/05861201-lever-lying-leg-curl-thighs.mp4",
+      "thumbnailPath": "workouts/images/05861201-lever-lying-leg-curl-thighs-thumb.jpg"
+    },
+    {
+      "sourceId": "06521201",
+      "videoPath": "workouts/videos/06521201-pull-up-back.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "07391201",
+      "videoPath": "workouts/videos/07391201-sled-45-leg-press-hips.mp4",
+      "thumbnailPath": "workouts/images/07391201-sled-45-leg-press-hips-thumb.jpg"
+    },
+    {
+      "sourceId": "07481201",
+      "videoPath": "workouts/videos/07481201-smith-bench-press-chest.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "08141201",
+      "videoPath": "workouts/videos/08141201-triceps-dip-upper-arms.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "08411201",
+      "videoPath": "workouts/videos/08411201-weighted-pull-up-back.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "08571201",
+      "videoPath": "workouts/videos/08571201-wheel-rollout-waist.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "11651201",
+      "videoPath": "workouts/videos/11651201-barbell-standing-military-press-shoulders.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "11971201",
+      "videoPath": "workouts/videos/11971201-squat-m-thighs.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "11991201",
+      "videoPath": "workouts/videos/11991201-sumo-deadlift-high-pull-thighs-shoulders.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "12001201",
+      "videoPath": "workouts/videos/12001201-push-press-shoulders.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "12041201",
+      "videoPath": "workouts/videos/12041201-cable-one-arm-lat-pulldown-back.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "12241201",
+      "videoPath": "workouts/videos/12241201-smith-standing-shoulder-press-shoulders.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "12691201",
+      "videoPath": "workouts/videos/12691201-cable-standing-up-straight-crossovers-chest.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "13261201",
+      "videoPath": "workouts/videos/13261201-chin-up-back.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "14791201",
+      "videoPath": "workouts/videos/14791201-lever-incline-chest-press-chest.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "17551201",
+      "videoPath": "workouts/videos/17551201-weighted-tricep-dips-upper-arms.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "17561201",
+      "videoPath": "workouts/videos/17561201-barbell-single-leg-deadlift-hips.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "22671201",
+      "videoPath": "workouts/videos/22671201-lever-seated-leg-press-thighs.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "22811201",
+      "videoPath": "workouts/videos/22811201-dumbbell-goblet-squat-female-thighs.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "22901201",
+      "videoPath": "workouts/videos/22901201-dumbbell-bulgarian-split-squat-female-thighs.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "24381201",
+      "videoPath": "workouts/videos/24381201-cable-pushdown-with-rope-attachment-female-upper-arms.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "29761201",
+      "videoPath": "workouts/videos/29761201-landmine-squat-and-press.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "57771201",
+      "videoPath": "workouts/videos/57771201-glute-ham-raise-female-thighs.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "62141201",
+      "videoPath": "workouts/videos/62141201-lying-scissors-cross-male-hips.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "66961201",
+      "videoPath": "workouts/videos/66961201-sit-wall-female-thighs.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "69241201",
+      "videoPath": "workouts/videos/69241201-side-step-deep-squat-male-plyometrics.mp4",
+      "thumbnailPath": null
+    },
+    {
+      "sourceId": "77441201",
+      "videoPath": "workouts/videos/77441201-cable-standing-supinated-face-pull-with-rope-sho.mp4",
+      "thumbnailPath": null
+    }
+  ],
+  "renameMappings": {
+    "videos": [
+      {
+        "sourceId": "00251201",
+        "oldFile": "00251201-Barbell-Bench-Press_Chest.mp4",
+        "newFile": "00251201-barbell-bench-press-chest.mp4",
+        "oldPath": "workouts/videos/00251201-Barbell-Bench-Press_Chest.mp4",
+        "newPath": "workouts/videos/00251201-barbell-bench-press-chest.mp4"
+      },
+      {
+        "sourceId": "00301201",
+        "oldFile": "00301201-Barbell-Close-Grip-Bench-Press_Upper-Arms.mp4",
+        "newFile": "00301201-barbell-close-grip-bench-press-upper-arms.mp4",
+        "oldPath": "workouts/videos/00301201-Barbell-Close-Grip-Bench-Press_Upper-Arms.mp4",
+        "newPath": "workouts/videos/00301201-barbell-close-grip-bench-press-upper-arms.mp4"
+      },
+      {
+        "sourceId": "00311201",
+        "oldFile": "00311201-Barbell-Curl_Upper-Arms.mp4",
+        "newFile": "00311201-barbell-curl-upper-arms.mp4",
+        "oldPath": "workouts/videos/00311201-Barbell-Curl_Upper-Arms.mp4",
+        "newPath": "workouts/videos/00311201-barbell-curl-upper-arms.mp4"
+      },
+      {
+        "sourceId": "00321201",
+        "oldFile": "00321201-Barbell-Deadlift_Hips-FIX.mp4",
+        "newFile": "00321201-barbell-deadlift-hips-fix.mp4",
+        "oldPath": "workouts/videos/00321201-Barbell-Deadlift_Hips-FIX.mp4",
+        "newPath": "workouts/videos/00321201-barbell-deadlift-hips-fix.mp4"
+      },
+      {
+        "sourceId": "00331201",
+        "oldFile": "00331201-Barbell-Decline-Bench-Press_Chest.mp4",
+        "newFile": "00331201-barbell-decline-bench-press-chest.mp4",
+        "oldPath": "workouts/videos/00331201-Barbell-Decline-Bench-Press_Chest.mp4",
+        "newPath": "workouts/videos/00331201-barbell-decline-bench-press-chest.mp4"
+      },
+      {
+        "sourceId": "00431201",
+        "oldFile": "00431201-Barbell-Full-Squat_Thighs.mp4",
+        "newFile": "00431201-barbell-full-squat-thighs.mp4",
+        "oldPath": "workouts/videos/00431201-Barbell-Full-Squat_Thighs.mp4",
+        "newPath": "workouts/videos/00431201-barbell-full-squat-thighs.mp4"
+      },
+      {
+        "sourceId": "00441201",
+        "oldFile": "00441201-Barbell-Good-Morning_Thighs.mp4",
+        "newFile": "00441201-barbell-good-morning-thighs.mp4",
+        "oldPath": "workouts/videos/00441201-Barbell-Good-Morning_Thighs.mp4",
+        "newPath": "workouts/videos/00441201-barbell-good-morning-thighs.mp4"
+      },
+      {
+        "sourceId": "00471201",
+        "oldFile": "00471201-Barbell-Incline-Bench-Press_Chest.mp4",
+        "newFile": "00471201-barbell-incline-bench-press-chest.mp4",
+        "oldPath": "workouts/videos/00471201-Barbell-Incline-Bench-Press_Chest.mp4",
+        "newPath": "workouts/videos/00471201-barbell-incline-bench-press-chest.mp4"
+      },
+      {
+        "sourceId": "00601201",
+        "oldFile": "00601201-Barbell-Lying-Triceps-Extension-Skull-Crusher_Upper-Arms.mp4",
+        "newFile": "00601201-barbell-lying-triceps-extension-skull-crusher-upper-arms.mp4",
+        "oldPath": "workouts/videos/00601201-Barbell-Lying-Triceps-Extension-Skull-Crusher_Upper-Arms.mp4",
+        "newPath": "workouts/videos/00601201-barbell-lying-triceps-extension-skull-crusher-upper-arms.mp4"
+      },
+      {
+        "sourceId": "00851201",
+        "oldFile": "00851201-Barbell-Romanian-Deadlift_Hips-FIX_.mp4",
+        "newFile": "00851201-barbell-romanian-deadlift-hips-fix.mp4",
+        "oldPath": "workouts/videos/00851201-Barbell-Romanian-Deadlift_Hips-FIX_.mp4",
+        "newPath": "workouts/videos/00851201-barbell-romanian-deadlift-hips-fix.mp4"
+      },
+      {
+        "sourceId": "01211201",
+        "oldFile": "01211201-Barbell-Upright-Row_Shoulders.mp4",
+        "newFile": "01211201-barbell-upright-row-shoulders.mp4",
+        "oldPath": "workouts/videos/01211201-Barbell-Upright-Row_Shoulders.mp4",
+        "newPath": "workouts/videos/01211201-barbell-upright-row-shoulders.mp4"
+      },
+      {
+        "sourceId": "01501201",
+        "oldFile": "01501201-Cable-Bar-Lateral-Pulldown_Back.mp4",
+        "newFile": "01501201-cable-bar-lateral-pulldown-back.mp4",
+        "oldPath": "workouts/videos/01501201-Cable-Bar-Lateral-Pulldown_Back.mp4",
+        "newPath": "workouts/videos/01501201-cable-bar-lateral-pulldown-back.mp4"
+      },
+      {
+        "sourceId": "01511201",
+        "oldFile": "01511201-Cable-Bench-Press_Chest.mp4",
+        "newFile": "01511201-cable-bench-press-chest.mp4",
+        "oldPath": "workouts/videos/01511201-Cable-Bench-Press_Chest.mp4",
+        "newPath": "workouts/videos/01511201-cable-bench-press-chest.mp4"
+      },
+      {
+        "sourceId": "01621201",
+        "oldFile": "01621201-Cable-Front-Raise_Shoulders.mp4",
+        "newFile": "01621201-cable-front-raise-shoulders.mp4",
+        "oldPath": "workouts/videos/01621201-Cable-Front-Raise_Shoulders.mp4",
+        "newPath": "workouts/videos/01621201-cable-front-raise-shoulders.mp4"
+      },
+      {
+        "sourceId": "01781201",
+        "oldFile": "01781201-Cable-Lateral-Raise_shoulder.mp4",
+        "newFile": "01781201-cable-lateral-raise-shoulder.mp4",
+        "oldPath": "workouts/videos/01781201-Cable-Lateral-Raise_shoulder.mp4",
+        "newPath": "workouts/videos/01781201-cable-lateral-raise-shoulder.mp4"
+      },
+      {
+        "sourceId": "01801201",
+        "oldFile": "01801201-Cable-Low-Seated-Row_Back.mp4",
+        "newFile": "01801201-cable-low-seated-row-back.mp4",
+        "oldPath": "workouts/videos/01801201-Cable-Low-Seated-Row_Back.mp4",
+        "newPath": "workouts/videos/01801201-cable-low-seated-row-back.mp4"
+      },
+      {
+        "sourceId": "02011201",
+        "oldFile": "02011201-Cable-Pushdown_Upper-Arms.mp4",
+        "newFile": "02011201-cable-pushdown-upper-arms.mp4",
+        "oldPath": "workouts/videos/02011201-Cable-Pushdown_Upper-Arms.mp4",
+        "newPath": "workouts/videos/02011201-cable-pushdown-upper-arms.mp4"
+      },
+      {
+        "sourceId": "02081201",
+        "oldFile": "02081201-Cable-Reverse-grip-Straight-Back-Seated-High-Row_Back.mp4",
+        "newFile": "02081201-cable-reverse-grip-straight-back-seated-high-row-back.mp4",
+        "oldPath": "workouts/videos/02081201-Cable-Reverse-grip-Straight-Back-Seated-High-Row_Back.mp4",
+        "newPath": "workouts/videos/02081201-cable-reverse-grip-straight-back-seated-high-row-back.mp4"
+      },
+      {
+        "sourceId": "02381201",
+        "oldFile": "02381201-Cable-Straight-Arm-Pulldown_Back.mp4",
+        "newFile": "02381201-cable-straight-arm-pulldown-back.mp4",
+        "oldPath": "workouts/videos/02381201-Cable-Straight-Arm-Pulldown_Back.mp4",
+        "newPath": "workouts/videos/02381201-cable-straight-arm-pulldown-back.mp4"
+      },
+      {
+        "sourceId": "02831201",
+        "oldFile": "02831201-Diamond-Push-up_Upper-Arms.mp4",
+        "newFile": "02831201-diamond-push-up-upper-arms.mp4",
+        "oldPath": "workouts/videos/02831201-Diamond-Push-up_Upper-Arms.mp4",
+        "newPath": "workouts/videos/02831201-diamond-push-up-upper-arms.mp4"
+      },
+      {
+        "sourceId": "02871201",
+        "oldFile": "02871201-Dumbbell-Arnold-Press-II_Shoulders.mp4",
+        "newFile": "02871201-dumbbell-arnold-press-ii-shoulders.mp4",
+        "oldPath": "workouts/videos/02871201-Dumbbell-Arnold-Press-II_Shoulders.mp4",
+        "newPath": "workouts/videos/02871201-dumbbell-arnold-press-ii-shoulders.mp4"
+      },
+      {
+        "sourceId": "02891201",
+        "oldFile": "02891201-Dumbbell-Bench-Press_Chest.mp4",
+        "newFile": "02891201-dumbbell-bench-press-chest.mp4",
+        "oldPath": "workouts/videos/02891201-Dumbbell-Bench-Press_Chest.mp4",
+        "newPath": "workouts/videos/02891201-dumbbell-bench-press-chest.mp4"
+      },
+      {
+        "sourceId": "02921201",
+        "oldFile": "02921201-Dumbbell-Bent-over-Row_Back.mp4",
+        "newFile": "02921201-dumbbell-bent-over-row-back.mp4",
+        "oldPath": "workouts/videos/02921201-Dumbbell-Bent-over-Row_Back.mp4",
+        "newPath": "workouts/videos/02921201-dumbbell-bent-over-row-back.mp4"
+      },
+      {
+        "sourceId": "02931201",
+        "oldFile": "02931201-Dumbbell-Bent-Over-Row_Back.mp4",
+        "newFile": "02931201-dumbbell-bent-over-row-back.mp4",
+        "oldPath": "workouts/videos/02931201-Dumbbell-Bent-Over-Row_Back.mp4",
+        "newPath": "workouts/videos/02931201-dumbbell-bent-over-row-back.mp4"
+      },
+      {
+        "sourceId": "02941201",
+        "oldFile": "02941201-Dumbbell-Biceps-Curl_Upper-Arms.mp4",
+        "newFile": "02941201-dumbbell-biceps-curl-upper-arms.mp4",
+        "oldPath": "workouts/videos/02941201-Dumbbell-Biceps-Curl_Upper-Arms.mp4",
+        "newPath": "workouts/videos/02941201-dumbbell-biceps-curl-upper-arms.mp4"
+      },
+      {
+        "sourceId": "03101201",
+        "oldFile": "03101201-Dumbbell-Front-Raise_Shoulders.mp4",
+        "newFile": "03101201-dumbbell-front-raise-shoulders.mp4",
+        "oldPath": "workouts/videos/03101201-Dumbbell-Front-Raise_Shoulders.mp4",
+        "newPath": "workouts/videos/03101201-dumbbell-front-raise-shoulders.mp4"
+      },
+      {
+        "sourceId": "03121201",
+        "oldFile": "03121201-Dumbbell-Hammer-Curl-(version-2)_Upper-Arms.mp4",
+        "newFile": "03121201-dumbbell-hammer-curl-upper-arms.mp4",
+        "oldPath": "workouts/videos/03121201-Dumbbell-Hammer-Curl-(version-2)_Upper-Arms.mp4",
+        "newPath": "workouts/videos/03121201-dumbbell-hammer-curl-upper-arms.mp4"
+      },
+      {
+        "sourceId": "03141201",
+        "oldFile": "03141201-Dumbbell-Incline-Bench-Press_Chest.mp4",
+        "newFile": "03141201-dumbbell-incline-bench-press-chest.mp4",
+        "oldPath": "workouts/videos/03141201-Dumbbell-Incline-Bench-Press_Chest.mp4",
+        "newPath": "workouts/videos/03141201-dumbbell-incline-bench-press-chest.mp4"
+      },
+      {
+        "sourceId": "03331201",
+        "oldFile": "03331201-Dumbbell-Kickback_Upper-Arms.mp4",
+        "newFile": "03331201-dumbbell-kickback-upper-arms.mp4",
+        "oldPath": "workouts/videos/03331201-Dumbbell-Kickback_Upper-Arms.mp4",
+        "newPath": "workouts/videos/03331201-dumbbell-kickback-upper-arms.mp4"
+      },
+      {
+        "sourceId": "03341201",
+        "oldFile": "03341201-Dumbbell-Lateral-Raise_shoulder.mp4",
+        "newFile": "03341201-dumbbell-lateral-raise-shoulder.mp4",
+        "oldPath": "workouts/videos/03341201-Dumbbell-Lateral-Raise_shoulder.mp4",
+        "newPath": "workouts/videos/03341201-dumbbell-lateral-raise-shoulder.mp4"
+      },
+      {
+        "sourceId": "03621201",
+        "oldFile": "03621201-Dumbbell-One-Arm-Triceps-Extension-(on-bench)_Upper-Arms.mp4",
+        "newFile": "03621201-dumbbell-one-arm-triceps-extension-on-bench-upper-arms.mp4",
+        "oldPath": "workouts/videos/03621201-Dumbbell-One-Arm-Triceps-Extension-(on-bench)_Upper-Arms.mp4",
+        "newPath": "workouts/videos/03621201-dumbbell-one-arm-triceps-extension-on-bench-upper-arms.mp4"
+      },
+      {
+        "sourceId": "03831201",
+        "oldFile": "03831201-Dumbbell-Reverse-Fly_Shoulders.mp4",
+        "newFile": "03831201-dumbbell-reverse-fly-shoulders.mp4",
+        "oldPath": "workouts/videos/03831201-Dumbbell-Reverse-Fly_Shoulders.mp4",
+        "newPath": "workouts/videos/03831201-dumbbell-reverse-fly-shoulders.mp4"
+      },
+      {
+        "sourceId": "04051201",
+        "oldFile": "04051201-Dumbbell-Seated-Shoulder-Press_Shoulders.mp4",
+        "newFile": "04051201-dumbbell-seated-shoulder-press-shoulders.mp4",
+        "oldPath": "workouts/videos/04051201-Dumbbell-Seated-Shoulder-Press_Shoulders.mp4",
+        "newPath": "workouts/videos/04051201-dumbbell-seated-shoulder-press-shoulders.mp4"
+      },
+      {
+        "sourceId": "04061201",
+        "oldFile": "04061201-Dumbbell-Shrug_Back.mp4",
+        "newFile": "04061201-dumbbell-shrug-back.mp4",
+        "oldPath": "workouts/videos/04061201-Dumbbell-Shrug_Back.mp4",
+        "newPath": "workouts/videos/04061201-dumbbell-shrug-back.mp4"
+      },
+      {
+        "sourceId": "04071201",
+        "oldFile": "04071201-Dumbbell-Side-Bend_Waist.mp4",
+        "newFile": "04071201-dumbbell-side-bend-waist.mp4",
+        "oldPath": "workouts/videos/04071201-Dumbbell-Side-Bend_Waist.mp4",
+        "newPath": "workouts/videos/04071201-dumbbell-side-bend-waist.mp4"
+      },
+      {
+        "sourceId": "04131201",
+        "oldFile": "04131201-Dumbbell-Squat_Hips_.mp4",
+        "newFile": "04131201-dumbbell-squat-hips.mp4",
+        "oldPath": "workouts/videos/04131201-Dumbbell-Squat_Hips_.mp4",
+        "newPath": "workouts/videos/04131201-dumbbell-squat-hips.mp4"
+      },
+      {
+        "sourceId": "04261201",
+        "oldFile": "04261201-Dumbbell-Standing-Overhead-Press_shoulder.mp4",
+        "newFile": "04261201-dumbbell-standing-overhead-press-shoulder.mp4",
+        "oldPath": "workouts/videos/04261201-Dumbbell-Standing-Overhead-Press_shoulder.mp4",
+        "newPath": "workouts/videos/04261201-dumbbell-standing-overhead-press-shoulder.mp4"
+      },
+      {
+        "sourceId": "04301201",
+        "oldFile": "04301201-Dumbbell-Standing-Triceps-Extension_Upper-Arms.mp4",
+        "newFile": "04301201-dumbbell-standing-triceps-extension-upper-arms.mp4",
+        "oldPath": "workouts/videos/04301201-Dumbbell-Standing-Triceps-Extension_Upper-Arms.mp4",
+        "newPath": "workouts/videos/04301201-dumbbell-standing-triceps-extension-upper-arms.mp4"
+      },
+      {
+        "sourceId": "04661201",
+        "oldFile": "04661201-Sternum-Pull-up-(Gironda)_Back_.mp4",
+        "newFile": "04661201-sternum-pull-up-gironda-back.mp4",
+        "oldPath": "workouts/videos/04661201-Sternum-Pull-up-(Gironda)_Back_.mp4",
+        "newPath": "workouts/videos/04661201-sternum-pull-up-gironda-back.mp4"
+      },
+      {
+        "sourceId": "05721201",
+        "oldFile": "05721201-Lever-Assisted-Chin-Up_Back_.mp4",
+        "newFile": "05721201-lever-assisted-chin-up-back.mp4",
+        "oldPath": "workouts/videos/05721201-Lever-Assisted-Chin-Up_Back_.mp4",
+        "newPath": "workouts/videos/05721201-lever-assisted-chin-up-back.mp4"
+      },
+      {
+        "sourceId": "05761201",
+        "oldFile": "05761201-Lever-Chest-Press-(plate-loaded)_Chest.mp4",
+        "newFile": "05761201-lever-chest-press-plate-loaded-chest.mp4",
+        "oldPath": "workouts/videos/05761201-Lever-Chest-Press-(plate-loaded)_Chest.mp4",
+        "newPath": "workouts/videos/05761201-lever-chest-press-plate-loaded-chest.mp4"
+      },
+      {
+        "sourceId": "05771201",
+        "oldFile": "05771201-Lever-Chest-Press_Chest.mp4",
+        "newFile": "05771201-lever-chest-press-chest.mp4",
+        "oldPath": "workouts/videos/05771201-Lever-Chest-Press_Chest.mp4",
+        "newPath": "workouts/videos/05771201-lever-chest-press-chest.mp4"
+      },
+      {
+        "sourceId": "05791201",
+        "oldFile": "05791201-Lever-Front-Pulldown_Back.mp4",
+        "newFile": "05791201-lever-front-pulldown-back.mp4",
+        "oldPath": "workouts/videos/05791201-Lever-Front-Pulldown_Back.mp4",
+        "newPath": "workouts/videos/05791201-lever-front-pulldown-back.mp4"
+      },
+      {
+        "sourceId": "05851201",
+        "oldFile": "05851201-Lever-Leg-Extension_Thighs.mp4",
+        "newFile": "05851201-lever-leg-extension-thighs.mp4",
+        "oldPath": "workouts/videos/05851201-Lever-Leg-Extension_Thighs.mp4",
+        "newPath": "workouts/videos/05851201-lever-leg-extension-thighs.mp4"
+      },
+      {
+        "sourceId": "05861201",
+        "oldFile": "05861201-Lever-Lying-Leg-Curl_Thighs.mp4",
+        "newFile": "05861201-lever-lying-leg-curl-thighs.mp4",
+        "oldPath": "workouts/videos/05861201-Lever-Lying-Leg-Curl_Thighs.mp4",
+        "newPath": "workouts/videos/05861201-lever-lying-leg-curl-thighs.mp4"
+      },
+      {
+        "sourceId": "06521201",
+        "oldFile": "06521201-Pull-up_Back.mp4",
+        "newFile": "06521201-pull-up-back.mp4",
+        "oldPath": "workouts/videos/06521201-Pull-up_Back.mp4",
+        "newPath": "workouts/videos/06521201-pull-up-back.mp4"
+      },
+      {
+        "sourceId": "07391201",
+        "oldFile": "07391201-Sled-45-Leg-Press_Hips.mp4",
+        "newFile": "07391201-sled-45-leg-press-hips.mp4",
+        "oldPath": "workouts/videos/07391201-Sled-45-Leg-Press_Hips.mp4",
+        "newPath": "workouts/videos/07391201-sled-45-leg-press-hips.mp4"
+      },
+      {
+        "sourceId": "07481201",
+        "oldFile": "07481201-Smith-Bench-Press_Chest.mp4",
+        "newFile": "07481201-smith-bench-press-chest.mp4",
+        "oldPath": "workouts/videos/07481201-Smith-Bench-Press_Chest.mp4",
+        "newPath": "workouts/videos/07481201-smith-bench-press-chest.mp4"
+      },
+      {
+        "sourceId": "08141201",
+        "oldFile": "08141201-Triceps-Dip_Upper-Arms.mp4",
+        "newFile": "08141201-triceps-dip-upper-arms.mp4",
+        "oldPath": "workouts/videos/08141201-Triceps-Dip_Upper-Arms.mp4",
+        "newPath": "workouts/videos/08141201-triceps-dip-upper-arms.mp4"
+      },
+      {
+        "sourceId": "08411201",
+        "oldFile": "08411201-Weighted-Pull-Up_Back_.mp4",
+        "newFile": "08411201-weighted-pull-up-back.mp4",
+        "oldPath": "workouts/videos/08411201-Weighted-Pull-Up_Back_.mp4",
+        "newPath": "workouts/videos/08411201-weighted-pull-up-back.mp4"
+      },
+      {
+        "sourceId": "08571201",
+        "oldFile": "08571201-Wheel-Rollout_Waist.mp4",
+        "newFile": "08571201-wheel-rollout-waist.mp4",
+        "oldPath": "workouts/videos/08571201-Wheel-Rollout_Waist.mp4",
+        "newPath": "workouts/videos/08571201-wheel-rollout-waist.mp4"
+      },
+      {
+        "sourceId": "11651201",
+        "oldFile": "11651201-Barbell-Standing-Military-Press-(without-rack)_Shoulders.mp4",
+        "newFile": "11651201-barbell-standing-military-press-shoulders.mp4",
+        "oldPath": "workouts/videos/11651201-Barbell-Standing-Military-Press-(without-rack)_Shoulders.mp4",
+        "newPath": "workouts/videos/11651201-barbell-standing-military-press-shoulders.mp4"
+      },
+      {
+        "sourceId": "11971201",
+        "oldFile": "11971201-Squat-m_Thighs.mp4",
+        "newFile": "11971201-squat-m-thighs.mp4",
+        "oldPath": "workouts/videos/11971201-Squat-m_Thighs.mp4",
+        "newPath": "workouts/videos/11971201-squat-m-thighs.mp4"
+      },
+      {
+        "sourceId": "11991201",
+        "oldFile": "11991201-Sumo-Deadlift-High-Pull_Thighs_Shoulders.mp4",
+        "newFile": "11991201-sumo-deadlift-high-pull-thighs-shoulders.mp4",
+        "oldPath": "workouts/videos/11991201-Sumo-Deadlift-High-Pull_Thighs_Shoulders.mp4",
+        "newPath": "workouts/videos/11991201-sumo-deadlift-high-pull-thighs-shoulders.mp4"
+      },
+      {
+        "sourceId": "12001201",
+        "oldFile": "12001201-Push-Press_Shoulders.mp4",
+        "newFile": "12001201-push-press-shoulders.mp4",
+        "oldPath": "workouts/videos/12001201-Push-Press_Shoulders.mp4",
+        "newPath": "workouts/videos/12001201-push-press-shoulders.mp4"
+      },
+      {
+        "sourceId": "12041201",
+        "oldFile": "12041201-Cable-one-arm-lat-pulldown_back.mp4",
+        "newFile": "12041201-cable-one-arm-lat-pulldown-back.mp4",
+        "oldPath": "workouts/videos/12041201-Cable-one-arm-lat-pulldown_back.mp4",
+        "newPath": "workouts/videos/12041201-cable-one-arm-lat-pulldown-back.mp4"
+      },
+      {
+        "sourceId": "12241201",
+        "oldFile": "12241201-Smith-Standing-Shoulder-Press_Shoulders.mp4",
+        "newFile": "12241201-smith-standing-shoulder-press-shoulders.mp4",
+        "oldPath": "workouts/videos/12241201-Smith-Standing-Shoulder-Press_Shoulders.mp4",
+        "newPath": "workouts/videos/12241201-smith-standing-shoulder-press-shoulders.mp4"
+      },
+      {
+        "sourceId": "12691201",
+        "oldFile": "12691201-Cable-Standing-Up-Straight-Crossovers_Chest.mp4",
+        "newFile": "12691201-cable-standing-up-straight-crossovers-chest.mp4",
+        "oldPath": "workouts/videos/12691201-Cable-Standing-Up-Straight-Crossovers_Chest.mp4",
+        "newPath": "workouts/videos/12691201-cable-standing-up-straight-crossovers-chest.mp4"
+      },
+      {
+        "sourceId": "13261201",
+        "oldFile": "13261201-Chin-Up_Back.mp4",
+        "newFile": "13261201-chin-up-back.mp4",
+        "oldPath": "workouts/videos/13261201-Chin-Up_Back.mp4",
+        "newPath": "workouts/videos/13261201-chin-up-back.mp4"
+      },
+      {
+        "sourceId": "14791201",
+        "oldFile": "14791201-Lever-Incline-Chest-Press_Chest.mp4",
+        "newFile": "14791201-lever-incline-chest-press-chest.mp4",
+        "oldPath": "workouts/videos/14791201-Lever-Incline-Chest-Press_Chest.mp4",
+        "newPath": "workouts/videos/14791201-lever-incline-chest-press-chest.mp4"
+      },
+      {
+        "sourceId": "17551201",
+        "oldFile": "17551201-Weighted-Tricep-Dips_Upper-Arms_.mp4",
+        "newFile": "17551201-weighted-tricep-dips-upper-arms.mp4",
+        "oldPath": "workouts/videos/17551201-Weighted-Tricep-Dips_Upper-Arms_.mp4",
+        "newPath": "workouts/videos/17551201-weighted-tricep-dips-upper-arms.mp4"
+      },
+      {
+        "sourceId": "17561201",
+        "oldFile": "17561201-Barbell-Single-Leg-Deadlift_Hips_.mp4",
+        "newFile": "17561201-barbell-single-leg-deadlift-hips.mp4",
+        "oldPath": "workouts/videos/17561201-Barbell-Single-Leg-Deadlift_Hips_.mp4",
+        "newPath": "workouts/videos/17561201-barbell-single-leg-deadlift-hips.mp4"
+      },
+      {
+        "sourceId": "22671201",
+        "oldFile": "22671201-Lever-Seated-Leg-Press_Thighs.mp4",
+        "newFile": "22671201-lever-seated-leg-press-thighs.mp4",
+        "oldPath": "workouts/videos/22671201-Lever-Seated-Leg-Press_Thighs.mp4",
+        "newPath": "workouts/videos/22671201-lever-seated-leg-press-thighs.mp4"
+      },
+      {
+        "sourceId": "22811201",
+        "oldFile": "22811201-Dumbbell-Goblet-Squat-(female)_Thighs.mp4",
+        "newFile": "22811201-dumbbell-goblet-squat-female-thighs.mp4",
+        "oldPath": "workouts/videos/22811201-Dumbbell-Goblet-Squat-(female)_Thighs.mp4",
+        "newPath": "workouts/videos/22811201-dumbbell-goblet-squat-female-thighs.mp4"
+      },
+      {
+        "sourceId": "22901201",
+        "oldFile": "22901201-Dumbbell-Bulgarian-Split-Squat-(female)_Thighs.mp4",
+        "newFile": "22901201-dumbbell-bulgarian-split-squat-female-thighs.mp4",
+        "oldPath": "workouts/videos/22901201-Dumbbell-Bulgarian-Split-Squat-(female)_Thighs.mp4",
+        "newPath": "workouts/videos/22901201-dumbbell-bulgarian-split-squat-female-thighs.mp4"
+      },
+      {
+        "sourceId": "24381201",
+        "oldFile": "24381201-Cable-Pushdown-(with-rope-attachment)-(female)_Upper-Arms.mp4",
+        "newFile": "24381201-cable-pushdown-with-rope-attachment-female-upper-arms.mp4",
+        "oldPath": "workouts/videos/24381201-Cable-Pushdown-(with-rope-attachment)-(female)_Upper-Arms.mp4",
+        "newPath": "workouts/videos/24381201-cable-pushdown-with-rope-attachment-female-upper-arms.mp4"
+      },
+      {
+        "sourceId": "29761201",
+        "oldFile": "29761201-Landmine-Squat-and-Press_.mp4",
+        "newFile": "29761201-landmine-squat-and-press.mp4",
+        "oldPath": "workouts/videos/29761201-Landmine-Squat-and-Press_.mp4",
+        "newPath": "workouts/videos/29761201-landmine-squat-and-press.mp4"
+      },
+      {
+        "sourceId": "57771201",
+        "oldFile": "57771201-Glute-Ham-Raise-(VERSION-2)-(female)_Thighs_.mp4",
+        "newFile": "57771201-glute-ham-raise-female-thighs.mp4",
+        "oldPath": "workouts/videos/57771201-Glute-Ham-Raise-(VERSION-2)-(female)_Thighs_.mp4",
+        "newPath": "workouts/videos/57771201-glute-ham-raise-female-thighs.mp4"
+      },
+      {
+        "sourceId": "62141201",
+        "oldFile": "62141201-Lying-Scissors-Cross-(male)_Hips_.mp4",
+        "newFile": "62141201-lying-scissors-cross-male-hips.mp4",
+        "oldPath": "workouts/videos/62141201-Lying-Scissors-Cross-(male)_Hips_.mp4",
+        "newPath": "workouts/videos/62141201-lying-scissors-cross-male-hips.mp4"
+      },
+      {
+        "sourceId": "66961201",
+        "oldFile": "66961201-Sit-(wall)-(female)_Thighs_.mp4",
+        "newFile": "66961201-sit-wall-female-thighs.mp4",
+        "oldPath": "workouts/videos/66961201-Sit-(wall)-(female)_Thighs_.mp4",
+        "newPath": "workouts/videos/66961201-sit-wall-female-thighs.mp4"
+      },
+      {
+        "sourceId": "69241201",
+        "oldFile": "69241201-Side-Step-Deep-Squat-(male)_Plyometrics_.mp4",
+        "newFile": "69241201-side-step-deep-squat-male-plyometrics.mp4",
+        "oldPath": "workouts/videos/69241201-Side-Step-Deep-Squat-(male)_Plyometrics_.mp4",
+        "newPath": "workouts/videos/69241201-side-step-deep-squat-male-plyometrics.mp4"
+      },
+      {
+        "sourceId": "77441201",
+        "oldFile": "77441201-Cable-Standing-Supinated-Face-Pull-(with-rope)_Sho.mp4",
+        "newFile": "77441201-cable-standing-supinated-face-pull-with-rope-sho.mp4",
+        "oldPath": "workouts/videos/77441201-Cable-Standing-Supinated-Face-Pull-(with-rope)_Sho.mp4",
+        "newPath": "workouts/videos/77441201-cable-standing-supinated-face-pull-with-rope-sho.mp4"
+      }
+    ],
+    "images": [
+      {
+        "sourceId": "00251201",
+        "oldFile": "00251201-Barbell-Bench-Press_Chest_thumbnail@3x.jpg",
+        "newFile": "00251201-barbell-bench-press-chest-thumb.jpg",
+        "oldPath": "workouts/images/00251201-Barbell-Bench-Press_Chest_thumbnail@3x.jpg",
+        "newPath": "workouts/images/00251201-barbell-bench-press-chest-thumb.jpg"
+      },
+      {
+        "sourceId": "00321201",
+        "oldFile": "00321201-Barbell-Deadlift_Hips-FIX_thumbnail@3x.jpg",
+        "newFile": "00321201-barbell-deadlift-hips-fix-thumb.jpg",
+        "oldPath": "workouts/images/00321201-Barbell-Deadlift_Hips-FIX_thumbnail@3x.jpg",
+        "newPath": "workouts/images/00321201-barbell-deadlift-hips-fix-thumb.jpg"
+      },
+      {
+        "sourceId": "01161201",
+        "oldFile": "01161201-Barbell-Straight-Leg-Deadlift_Thighs_thumbnail@3x.jpg",
+        "newFile": "01161201-barbell-straight-leg-deadlift-thighs-thumb.jpg",
+        "oldPath": "workouts/images/01161201-Barbell-Straight-Leg-Deadlift_Thighs_thumbnail@3x.jpg",
+        "newPath": "workouts/images/01161201-barbell-straight-leg-deadlift-thighs-thumb.jpg"
+      },
+      {
+        "sourceId": "01501201",
+        "oldFile": "01501201-Cable-Bar-Lateral-Pulldown_Back_thumbnail@3x.jpg",
+        "newFile": "01501201-cable-bar-lateral-pulldown-back-thumb.jpg",
+        "oldPath": "workouts/images/01501201-Cable-Bar-Lateral-Pulldown_Back_thumbnail@3x.jpg",
+        "newPath": "workouts/images/01501201-cable-bar-lateral-pulldown-back-thumb.jpg"
+      },
+      {
+        "sourceId": "01781201",
+        "oldFile": "01781201-Cable-Lateral-Raise_shoulder_thumbnail@3x.jpg",
+        "newFile": "01781201-cable-lateral-raise-shoulder-thumb.jpg",
+        "oldPath": "workouts/images/01781201-Cable-Lateral-Raise_shoulder_thumbnail@3x.jpg",
+        "newPath": "workouts/images/01781201-cable-lateral-raise-shoulder-thumb.jpg"
+      },
+      {
+        "sourceId": "01941201",
+        "oldFile": "01941201-Cable-Overhead-Triceps-Extension-(rope-attachment)_Upper-Arms-FIX_thumbnail_@3x.jpg",
+        "newFile": "01941201-cable-overhead-triceps-extension-rope-attachment-upper-arms-fix-thumb.jpg",
+        "oldPath": "workouts/images/01941201-Cable-Overhead-Triceps-Extension-(rope-attachment)_Upper-Arms-FIX_thumbnail_@3x.jpg",
+        "newPath": "workouts/images/01941201-cable-overhead-triceps-extension-rope-attachment-upper-arms-fix-thumb.jpg"
+      },
+      {
+        "sourceId": "02011201",
+        "oldFile": "02011201-Cable-Pushdown_Upper-Arms_thumbnail@3x.jpg",
+        "newFile": "02011201-cable-pushdown-upper-arms-thumb.jpg",
+        "oldPath": "workouts/images/02011201-Cable-Pushdown_Upper-Arms_thumbnail@3x.jpg",
+        "newPath": "workouts/images/02011201-cable-pushdown-upper-arms-thumb.jpg"
+      },
+      {
+        "sourceId": "03141201",
+        "oldFile": "03141201-Dumbbell-Incline-Bench-Press_Chest_thumbnail@3x.jpg",
+        "newFile": "03141201-dumbbell-incline-bench-press-chest-thumb.jpg",
+        "oldPath": "workouts/images/03141201-Dumbbell-Incline-Bench-Press_Chest_thumbnail@3x.jpg",
+        "newPath": "workouts/images/03141201-dumbbell-incline-bench-press-chest-thumb.jpg"
+      },
+      {
+        "sourceId": "03341201",
+        "oldFile": "03341201-Dumbbell-Lateral-Raise_shoulder_thumbnail@3x.jpg",
+        "newFile": "03341201-dumbbell-lateral-raise-shoulder-thumb.jpg",
+        "oldPath": "workouts/images/03341201-Dumbbell-Lateral-Raise_shoulder_thumbnail@3x.jpg",
+        "newPath": "workouts/images/03341201-dumbbell-lateral-raise-shoulder-thumb.jpg"
+      },
+      {
+        "sourceId": "04021201",
+        "oldFile": "04021201-Dumbbell-Seated-Preacher-Curl_Upper-Arms_thumbnail@3x.jpg",
+        "newFile": "04021201-dumbbell-seated-preacher-curl-upper-arms-thumb.jpg",
+        "oldPath": "workouts/images/04021201-Dumbbell-Seated-Preacher-Curl_Upper-Arms_thumbnail@3x.jpg",
+        "newPath": "workouts/images/04021201-dumbbell-seated-preacher-curl-upper-arms-thumb.jpg"
+      },
+      {
+        "sourceId": "04051201",
+        "oldFile": "04051201-Dumbbell-Seated-Shoulder-Press_Shoulders_thumbnail@3x.jpg",
+        "newFile": "04051201-dumbbell-seated-shoulder-press-shoulders-thumb.jpg",
+        "oldPath": "workouts/images/04051201-Dumbbell-Seated-Shoulder-Press_Shoulders_thumbnail@3x.jpg",
+        "newPath": "workouts/images/04051201-dumbbell-seated-shoulder-press-shoulders-thumb.jpg"
+      },
+      {
+        "sourceId": "04301201",
+        "oldFile": "04301201-Dumbbell-Standing-Triceps-Extension_Upper-Arms_thumbnail@3x.jpg",
+        "newFile": "04301201-dumbbell-standing-triceps-extension-upper-arms-thumb.jpg",
+        "oldPath": "workouts/images/04301201-Dumbbell-Standing-Triceps-Extension_Upper-Arms_thumbnail@3x.jpg",
+        "newPath": "workouts/images/04301201-dumbbell-standing-triceps-extension-upper-arms-thumb.jpg"
+      },
+      {
+        "sourceId": "05861201",
+        "oldFile": "05861201-Lever-Lying-Leg-Curl_Thighs_thumbnail@3x.jpg",
+        "newFile": "05861201-lever-lying-leg-curl-thighs-thumb.jpg",
+        "oldPath": "workouts/images/05861201-Lever-Lying-Leg-Curl_Thighs_thumbnail@3x.jpg",
+        "newPath": "workouts/images/05861201-lever-lying-leg-curl-thighs-thumb.jpg"
+      },
+      {
+        "sourceId": "07391201",
+        "oldFile": "07391201-Sled-45-Leg-Press_Hips_thumbnail@3x.jpg",
+        "newFile": "07391201-sled-45-leg-press-hips-thumb.jpg",
+        "oldPath": "workouts/images/07391201-Sled-45-Leg-Press_Hips_thumbnail@3x.jpg",
+        "newPath": "workouts/images/07391201-sled-45-leg-press-hips-thumb.jpg"
+      },
+      {
+        "sourceId": "10301201",
+        "oldFile": "10301201-Lever-Pec-Deck-Fly_Chest_thumbnail@3x.jpg",
+        "newFile": "10301201-lever-pec-deck-fly-chest-thumb.jpg",
+        "oldPath": "workouts/images/10301201-Lever-Pec-Deck-Fly_Chest_thumbnail@3x.jpg",
+        "newPath": "workouts/images/10301201-lever-pec-deck-fly-chest-thumb.jpg"
+      },
+      {
+        "sourceId": "10601101",
+        "oldFile": "10601101-Barbell-Hip-Thrust_Hips_small_thumbnail@3x.jpg",
+        "newFile": "10601101-barbell-hip-thrust-hips-thumb.jpg",
+        "oldPath": "workouts/images/10601101-Barbell-Hip-Thrust_Hips_small_thumbnail@3x.jpg",
+        "newPath": "workouts/images/10601101-barbell-hip-thrust-hips-thumb.jpg"
+      },
+      {
+        "sourceId": "12041101",
+        "oldFile": "12041101-Cable-one-arm-lat-pulldown_back_small_thumbnail@3x.jpg",
+        "newFile": "12041101-cable-one-arm-lat-pulldown-back-thumb.jpg",
+        "oldPath": "workouts/images/12041101-Cable-one-arm-lat-pulldown_back_small_thumbnail@3x.jpg",
+        "newPath": "workouts/images/12041101-cable-one-arm-lat-pulldown-back-thumb.jpg"
+      },
+      {
+        "sourceId": "14591201",
+        "oldFile": "14591201-Dumbbell-Romanian-Deadlift_Hips_thumbnail@3x.jpg",
+        "newFile": "14591201-dumbbell-romanian-deadlift-hips-thumb.jpg",
+        "oldPath": "workouts/images/14591201-Dumbbell-Romanian-Deadlift_Hips_thumbnail@3x.jpg",
+        "newPath": "workouts/images/14591201-dumbbell-romanian-deadlift-hips-thumb.jpg"
+      },
+      {
+        "sourceId": "26331201",
+        "oldFile": "26331201-Dumbbell-Seated-Palms-Up-Wrist-Curl-(female)_Forea_thumbnail_@3x.jpg",
+        "newFile": "26331201-dumbbell-seated-palms-up-wrist-curl-female-forea-thumb.jpg",
+        "oldPath": "workouts/images/26331201-Dumbbell-Seated-Palms-Up-Wrist-Curl-(female)_Forea_thumbnail_@3x.jpg",
+        "newPath": "workouts/images/26331201-dumbbell-seated-palms-up-wrist-curl-female-forea-thumb.jpg"
+      },
+      {
+        "sourceId": "26611201",
+        "oldFile": "26611201-Cable-Seated-Row-with-V-bar_Back_thumbnail_@3x.jpg",
+        "newFile": "26611201-cable-seated-row-with-v-bar-back-thumb.jpg",
+        "oldPath": "workouts/images/26611201-Cable-Seated-Row-with-V-bar_Back_thumbnail_@3x.jpg",
+        "newPath": "workouts/images/26611201-cable-seated-row-with-v-bar-back-thumb.jpg"
+      },
+      {
+        "sourceId": "50551101",
+        "oldFile": "50551101-Dead-Hang-Stretch_Stretching_small_thumbnail_@3x.jpg",
+        "newFile": "50551101-dead-hang-stretch-stretching-thumb.jpg",
+        "oldPath": "workouts/images/50551101-Dead-Hang-Stretch_Stretching_small_thumbnail_@3x.jpg",
+        "newPath": "workouts/images/50551101-dead-hang-stretch-stretching-thumb.jpg"
+      },
+      {
+        "sourceId": "63651201",
+        "oldFile": "63651201-EZ-Barbell-Standing-Back-Wrist-Curl_Forearms_thumbnail_@3x.jpg",
+        "newFile": "63651201-ez-barbell-standing-back-wrist-curl-forearms-thumb.jpg",
+        "oldPath": "workouts/images/63651201-EZ-Barbell-Standing-Back-Wrist-Curl_Forearms_thumbnail_@3x.jpg",
+        "newPath": "workouts/images/63651201-ez-barbell-standing-back-wrist-curl-forearms-thumb.jpg"
+      }
+    ],
+    "audio": [],
+    "oldToNew": {
+      "workouts/videos/00251201-Barbell-Bench-Press_Chest.mp4": "workouts/videos/00251201-barbell-bench-press-chest.mp4",
+      "workouts/videos/00301201-Barbell-Close-Grip-Bench-Press_Upper-Arms.mp4": "workouts/videos/00301201-barbell-close-grip-bench-press-upper-arms.mp4",
+      "workouts/videos/00311201-Barbell-Curl_Upper-Arms.mp4": "workouts/videos/00311201-barbell-curl-upper-arms.mp4",
+      "workouts/videos/00321201-Barbell-Deadlift_Hips-FIX.mp4": "workouts/videos/00321201-barbell-deadlift-hips-fix.mp4",
+      "workouts/videos/00331201-Barbell-Decline-Bench-Press_Chest.mp4": "workouts/videos/00331201-barbell-decline-bench-press-chest.mp4",
+      "workouts/videos/00431201-Barbell-Full-Squat_Thighs.mp4": "workouts/videos/00431201-barbell-full-squat-thighs.mp4",
+      "workouts/videos/00441201-Barbell-Good-Morning_Thighs.mp4": "workouts/videos/00441201-barbell-good-morning-thighs.mp4",
+      "workouts/videos/00471201-Barbell-Incline-Bench-Press_Chest.mp4": "workouts/videos/00471201-barbell-incline-bench-press-chest.mp4",
+      "workouts/videos/00601201-Barbell-Lying-Triceps-Extension-Skull-Crusher_Upper-Arms.mp4": "workouts/videos/00601201-barbell-lying-triceps-extension-skull-crusher-upper-arms.mp4",
+      "workouts/videos/00851201-Barbell-Romanian-Deadlift_Hips-FIX_.mp4": "workouts/videos/00851201-barbell-romanian-deadlift-hips-fix.mp4",
+      "workouts/videos/01211201-Barbell-Upright-Row_Shoulders.mp4": "workouts/videos/01211201-barbell-upright-row-shoulders.mp4",
+      "workouts/videos/01501201-Cable-Bar-Lateral-Pulldown_Back.mp4": "workouts/videos/01501201-cable-bar-lateral-pulldown-back.mp4",
+      "workouts/videos/01511201-Cable-Bench-Press_Chest.mp4": "workouts/videos/01511201-cable-bench-press-chest.mp4",
+      "workouts/videos/01621201-Cable-Front-Raise_Shoulders.mp4": "workouts/videos/01621201-cable-front-raise-shoulders.mp4",
+      "workouts/videos/01781201-Cable-Lateral-Raise_shoulder.mp4": "workouts/videos/01781201-cable-lateral-raise-shoulder.mp4",
+      "workouts/videos/01801201-Cable-Low-Seated-Row_Back.mp4": "workouts/videos/01801201-cable-low-seated-row-back.mp4",
+      "workouts/videos/02011201-Cable-Pushdown_Upper-Arms.mp4": "workouts/videos/02011201-cable-pushdown-upper-arms.mp4",
+      "workouts/videos/02081201-Cable-Reverse-grip-Straight-Back-Seated-High-Row_Back.mp4": "workouts/videos/02081201-cable-reverse-grip-straight-back-seated-high-row-back.mp4",
+      "workouts/videos/02381201-Cable-Straight-Arm-Pulldown_Back.mp4": "workouts/videos/02381201-cable-straight-arm-pulldown-back.mp4",
+      "workouts/videos/02831201-Diamond-Push-up_Upper-Arms.mp4": "workouts/videos/02831201-diamond-push-up-upper-arms.mp4",
+      "workouts/videos/02871201-Dumbbell-Arnold-Press-II_Shoulders.mp4": "workouts/videos/02871201-dumbbell-arnold-press-ii-shoulders.mp4",
+      "workouts/videos/02891201-Dumbbell-Bench-Press_Chest.mp4": "workouts/videos/02891201-dumbbell-bench-press-chest.mp4",
+      "workouts/videos/02921201-Dumbbell-Bent-over-Row_Back.mp4": "workouts/videos/02921201-dumbbell-bent-over-row-back.mp4",
+      "workouts/videos/02931201-Dumbbell-Bent-Over-Row_Back.mp4": "workouts/videos/02931201-dumbbell-bent-over-row-back.mp4",
+      "workouts/videos/02941201-Dumbbell-Biceps-Curl_Upper-Arms.mp4": "workouts/videos/02941201-dumbbell-biceps-curl-upper-arms.mp4",
+      "workouts/videos/03101201-Dumbbell-Front-Raise_Shoulders.mp4": "workouts/videos/03101201-dumbbell-front-raise-shoulders.mp4",
+      "workouts/videos/03121201-Dumbbell-Hammer-Curl-(version-2)_Upper-Arms.mp4": "workouts/videos/03121201-dumbbell-hammer-curl-upper-arms.mp4",
+      "workouts/videos/03141201-Dumbbell-Incline-Bench-Press_Chest.mp4": "workouts/videos/03141201-dumbbell-incline-bench-press-chest.mp4",
+      "workouts/videos/03331201-Dumbbell-Kickback_Upper-Arms.mp4": "workouts/videos/03331201-dumbbell-kickback-upper-arms.mp4",
+      "workouts/videos/03341201-Dumbbell-Lateral-Raise_shoulder.mp4": "workouts/videos/03341201-dumbbell-lateral-raise-shoulder.mp4",
+      "workouts/videos/03621201-Dumbbell-One-Arm-Triceps-Extension-(on-bench)_Upper-Arms.mp4": "workouts/videos/03621201-dumbbell-one-arm-triceps-extension-on-bench-upper-arms.mp4",
+      "workouts/videos/03831201-Dumbbell-Reverse-Fly_Shoulders.mp4": "workouts/videos/03831201-dumbbell-reverse-fly-shoulders.mp4",
+      "workouts/videos/04051201-Dumbbell-Seated-Shoulder-Press_Shoulders.mp4": "workouts/videos/04051201-dumbbell-seated-shoulder-press-shoulders.mp4",
+      "workouts/videos/04061201-Dumbbell-Shrug_Back.mp4": "workouts/videos/04061201-dumbbell-shrug-back.mp4",
+      "workouts/videos/04071201-Dumbbell-Side-Bend_Waist.mp4": "workouts/videos/04071201-dumbbell-side-bend-waist.mp4",
+      "workouts/videos/04131201-Dumbbell-Squat_Hips_.mp4": "workouts/videos/04131201-dumbbell-squat-hips.mp4",
+      "workouts/videos/04261201-Dumbbell-Standing-Overhead-Press_shoulder.mp4": "workouts/videos/04261201-dumbbell-standing-overhead-press-shoulder.mp4",
+      "workouts/videos/04301201-Dumbbell-Standing-Triceps-Extension_Upper-Arms.mp4": "workouts/videos/04301201-dumbbell-standing-triceps-extension-upper-arms.mp4",
+      "workouts/videos/04661201-Sternum-Pull-up-(Gironda)_Back_.mp4": "workouts/videos/04661201-sternum-pull-up-gironda-back.mp4",
+      "workouts/videos/05721201-Lever-Assisted-Chin-Up_Back_.mp4": "workouts/videos/05721201-lever-assisted-chin-up-back.mp4",
+      "workouts/videos/05761201-Lever-Chest-Press-(plate-loaded)_Chest.mp4": "workouts/videos/05761201-lever-chest-press-plate-loaded-chest.mp4",
+      "workouts/videos/05771201-Lever-Chest-Press_Chest.mp4": "workouts/videos/05771201-lever-chest-press-chest.mp4",
+      "workouts/videos/05791201-Lever-Front-Pulldown_Back.mp4": "workouts/videos/05791201-lever-front-pulldown-back.mp4",
+      "workouts/videos/05851201-Lever-Leg-Extension_Thighs.mp4": "workouts/videos/05851201-lever-leg-extension-thighs.mp4",
+      "workouts/videos/05861201-Lever-Lying-Leg-Curl_Thighs.mp4": "workouts/videos/05861201-lever-lying-leg-curl-thighs.mp4",
+      "workouts/videos/06521201-Pull-up_Back.mp4": "workouts/videos/06521201-pull-up-back.mp4",
+      "workouts/videos/07391201-Sled-45-Leg-Press_Hips.mp4": "workouts/videos/07391201-sled-45-leg-press-hips.mp4",
+      "workouts/videos/07481201-Smith-Bench-Press_Chest.mp4": "workouts/videos/07481201-smith-bench-press-chest.mp4",
+      "workouts/videos/08141201-Triceps-Dip_Upper-Arms.mp4": "workouts/videos/08141201-triceps-dip-upper-arms.mp4",
+      "workouts/videos/08411201-Weighted-Pull-Up_Back_.mp4": "workouts/videos/08411201-weighted-pull-up-back.mp4",
+      "workouts/videos/08571201-Wheel-Rollout_Waist.mp4": "workouts/videos/08571201-wheel-rollout-waist.mp4",
+      "workouts/videos/11651201-Barbell-Standing-Military-Press-(without-rack)_Shoulders.mp4": "workouts/videos/11651201-barbell-standing-military-press-shoulders.mp4",
+      "workouts/videos/11971201-Squat-m_Thighs.mp4": "workouts/videos/11971201-squat-m-thighs.mp4",
+      "workouts/videos/11991201-Sumo-Deadlift-High-Pull_Thighs_Shoulders.mp4": "workouts/videos/11991201-sumo-deadlift-high-pull-thighs-shoulders.mp4",
+      "workouts/videos/12001201-Push-Press_Shoulders.mp4": "workouts/videos/12001201-push-press-shoulders.mp4",
+      "workouts/videos/12041201-Cable-one-arm-lat-pulldown_back.mp4": "workouts/videos/12041201-cable-one-arm-lat-pulldown-back.mp4",
+      "workouts/videos/12241201-Smith-Standing-Shoulder-Press_Shoulders.mp4": "workouts/videos/12241201-smith-standing-shoulder-press-shoulders.mp4",
+      "workouts/videos/12691201-Cable-Standing-Up-Straight-Crossovers_Chest.mp4": "workouts/videos/12691201-cable-standing-up-straight-crossovers-chest.mp4",
+      "workouts/videos/13261201-Chin-Up_Back.mp4": "workouts/videos/13261201-chin-up-back.mp4",
+      "workouts/videos/14791201-Lever-Incline-Chest-Press_Chest.mp4": "workouts/videos/14791201-lever-incline-chest-press-chest.mp4",
+      "workouts/videos/17551201-Weighted-Tricep-Dips_Upper-Arms_.mp4": "workouts/videos/17551201-weighted-tricep-dips-upper-arms.mp4",
+      "workouts/videos/17561201-Barbell-Single-Leg-Deadlift_Hips_.mp4": "workouts/videos/17561201-barbell-single-leg-deadlift-hips.mp4",
+      "workouts/videos/22671201-Lever-Seated-Leg-Press_Thighs.mp4": "workouts/videos/22671201-lever-seated-leg-press-thighs.mp4",
+      "workouts/videos/22811201-Dumbbell-Goblet-Squat-(female)_Thighs.mp4": "workouts/videos/22811201-dumbbell-goblet-squat-female-thighs.mp4",
+      "workouts/videos/22901201-Dumbbell-Bulgarian-Split-Squat-(female)_Thighs.mp4": "workouts/videos/22901201-dumbbell-bulgarian-split-squat-female-thighs.mp4",
+      "workouts/videos/24381201-Cable-Pushdown-(with-rope-attachment)-(female)_Upper-Arms.mp4": "workouts/videos/24381201-cable-pushdown-with-rope-attachment-female-upper-arms.mp4",
+      "workouts/videos/29761201-Landmine-Squat-and-Press_.mp4": "workouts/videos/29761201-landmine-squat-and-press.mp4",
+      "workouts/videos/57771201-Glute-Ham-Raise-(VERSION-2)-(female)_Thighs_.mp4": "workouts/videos/57771201-glute-ham-raise-female-thighs.mp4",
+      "workouts/videos/62141201-Lying-Scissors-Cross-(male)_Hips_.mp4": "workouts/videos/62141201-lying-scissors-cross-male-hips.mp4",
+      "workouts/videos/66961201-Sit-(wall)-(female)_Thighs_.mp4": "workouts/videos/66961201-sit-wall-female-thighs.mp4",
+      "workouts/videos/69241201-Side-Step-Deep-Squat-(male)_Plyometrics_.mp4": "workouts/videos/69241201-side-step-deep-squat-male-plyometrics.mp4",
+      "workouts/videos/77441201-Cable-Standing-Supinated-Face-Pull-(with-rope)_Sho.mp4": "workouts/videos/77441201-cable-standing-supinated-face-pull-with-rope-sho.mp4",
+      "workouts/images/00251201-Barbell-Bench-Press_Chest_thumbnail@3x.jpg": "workouts/images/00251201-barbell-bench-press-chest-thumb.jpg",
+      "workouts/images/00321201-Barbell-Deadlift_Hips-FIX_thumbnail@3x.jpg": "workouts/images/00321201-barbell-deadlift-hips-fix-thumb.jpg",
+      "workouts/images/01161201-Barbell-Straight-Leg-Deadlift_Thighs_thumbnail@3x.jpg": "workouts/images/01161201-barbell-straight-leg-deadlift-thighs-thumb.jpg",
+      "workouts/images/01501201-Cable-Bar-Lateral-Pulldown_Back_thumbnail@3x.jpg": "workouts/images/01501201-cable-bar-lateral-pulldown-back-thumb.jpg",
+      "workouts/images/01781201-Cable-Lateral-Raise_shoulder_thumbnail@3x.jpg": "workouts/images/01781201-cable-lateral-raise-shoulder-thumb.jpg",
+      "workouts/images/01941201-Cable-Overhead-Triceps-Extension-(rope-attachment)_Upper-Arms-FIX_thumbnail_@3x.jpg": "workouts/images/01941201-cable-overhead-triceps-extension-rope-attachment-upper-arms-fix-thumb.jpg",
+      "workouts/images/02011201-Cable-Pushdown_Upper-Arms_thumbnail@3x.jpg": "workouts/images/02011201-cable-pushdown-upper-arms-thumb.jpg",
+      "workouts/images/03141201-Dumbbell-Incline-Bench-Press_Chest_thumbnail@3x.jpg": "workouts/images/03141201-dumbbell-incline-bench-press-chest-thumb.jpg",
+      "workouts/images/03341201-Dumbbell-Lateral-Raise_shoulder_thumbnail@3x.jpg": "workouts/images/03341201-dumbbell-lateral-raise-shoulder-thumb.jpg",
+      "workouts/images/04021201-Dumbbell-Seated-Preacher-Curl_Upper-Arms_thumbnail@3x.jpg": "workouts/images/04021201-dumbbell-seated-preacher-curl-upper-arms-thumb.jpg",
+      "workouts/images/04051201-Dumbbell-Seated-Shoulder-Press_Shoulders_thumbnail@3x.jpg": "workouts/images/04051201-dumbbell-seated-shoulder-press-shoulders-thumb.jpg",
+      "workouts/images/04301201-Dumbbell-Standing-Triceps-Extension_Upper-Arms_thumbnail@3x.jpg": "workouts/images/04301201-dumbbell-standing-triceps-extension-upper-arms-thumb.jpg",
+      "workouts/images/05861201-Lever-Lying-Leg-Curl_Thighs_thumbnail@3x.jpg": "workouts/images/05861201-lever-lying-leg-curl-thighs-thumb.jpg",
+      "workouts/images/07391201-Sled-45-Leg-Press_Hips_thumbnail@3x.jpg": "workouts/images/07391201-sled-45-leg-press-hips-thumb.jpg",
+      "workouts/images/10301201-Lever-Pec-Deck-Fly_Chest_thumbnail@3x.jpg": "workouts/images/10301201-lever-pec-deck-fly-chest-thumb.jpg",
+      "workouts/images/10601101-Barbell-Hip-Thrust_Hips_small_thumbnail@3x.jpg": "workouts/images/10601101-barbell-hip-thrust-hips-thumb.jpg",
+      "workouts/images/12041101-Cable-one-arm-lat-pulldown_back_small_thumbnail@3x.jpg": "workouts/images/12041101-cable-one-arm-lat-pulldown-back-thumb.jpg",
+      "workouts/images/14591201-Dumbbell-Romanian-Deadlift_Hips_thumbnail@3x.jpg": "workouts/images/14591201-dumbbell-romanian-deadlift-hips-thumb.jpg",
+      "workouts/images/26331201-Dumbbell-Seated-Palms-Up-Wrist-Curl-(female)_Forea_thumbnail_@3x.jpg": "workouts/images/26331201-dumbbell-seated-palms-up-wrist-curl-female-forea-thumb.jpg",
+      "workouts/images/26611201-Cable-Seated-Row-with-V-bar_Back_thumbnail_@3x.jpg": "workouts/images/26611201-cable-seated-row-with-v-bar-back-thumb.jpg",
+      "workouts/images/50551101-Dead-Hang-Stretch_Stretching_small_thumbnail_@3x.jpg": "workouts/images/50551101-dead-hang-stretch-stretching-thumb.jpg",
+      "workouts/images/63651201-EZ-Barbell-Standing-Back-Wrist-Curl_Forearms_thumbnail_@3x.jpg": "workouts/images/63651201-ez-barbell-standing-back-wrist-curl-forearms-thumb.jpg"
+    }
+  }
+}
