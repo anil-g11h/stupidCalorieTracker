@@ -27,6 +27,8 @@ const EAA_GROUP_SHORT_LABELS: Record<EaaRatioGroupKey, string> = {
   rest: 'Rest EAAs'
 };
 
+type FoodSortOption = 'default' | 'recent' | 'frequent' | 'protein';
+
 const MICRONUTRIENT_META = [
   { key: 'vitamin_a', label: 'Vitamin A', unit: 'mcg', aliases: ['vitamin a', 'retinol', 'vitamin a rae'] },
   { key: 'vitamin_c', label: 'Vitamin C', unit: 'mg', aliases: ['vitamin c', 'ascorbic acid'] },
@@ -91,6 +93,7 @@ export default function AddLogEntry() {
   const [selectedFood, setSelectedFood] = useState<Food | null>(null);
   const [inputValue, setInputValue] = useState(1);
   const [selectedUnit, setSelectedUnit] = useState('serving');
+  const [sortOption, setSortOption] = useState<FoodSortOption>('frequent');
   const [addedCount, setAddedCount] = useState(0);
   const [addedFoodIds, setAddedFoodIds] = useState<string[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -253,9 +256,56 @@ export default function AddLogEntry() {
     };
   }, [eaaDeficit]);
 
+  const allLogs = useLiveQuery(async () => db.logs.toArray(), []);
+
+  const logUsageByFood = useMemo(() => {
+    const usageMap = new Map<string, { count: number; latestLoggedAt: number }>();
+
+    (allLogs || []).forEach((log) => {
+      const current = usageMap.get(log.food_id) || { count: 0, latestLoggedAt: 0 };
+      const loggedAt = log.created_at ? new Date(log.created_at).getTime() : 0;
+      usageMap.set(log.food_id, {
+        count: current.count + 1,
+        latestLoggedAt: Math.max(current.latestLoggedAt, loggedAt)
+      });
+    });
+
+    return usageMap;
+  }, [allLogs]);
+
   const rankedSearchResults = useMemo(() => {
-    return searchResults || [];
-  }, [searchResults]);
+    const base = [...(searchResults || [])];
+
+    if (sortOption === 'recent') {
+      return base.sort((a, b) => {
+        const aCreatedAt = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const bCreatedAt = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return bCreatedAt - aCreatedAt;
+      });
+    }
+
+    if (sortOption === 'frequent') {
+      return base.sort((a, b) => {
+        const aUsage = logUsageByFood.get(a.id) || { count: 0, latestLoggedAt: 0 };
+        const bUsage = logUsageByFood.get(b.id) || { count: 0, latestLoggedAt: 0 };
+
+        if (bUsage.count !== aUsage.count) return bUsage.count - aUsage.count;
+        if (bUsage.latestLoggedAt !== aUsage.latestLoggedAt) {
+          return bUsage.latestLoggedAt - aUsage.latestLoggedAt;
+        }
+        return a.name.localeCompare(b.name);
+      });
+    }
+
+    if (sortOption === 'protein') {
+      return base.sort((a, b) => {
+        if (b.protein !== a.protein) return b.protein - a.protein;
+        return a.calories - b.calories;
+      });
+    }
+
+    return base;
+  }, [searchResults, sortOption, logUsageByFood]);
 
   const foodWarningsById = useLiveQuery(
     async () => {
@@ -615,6 +665,17 @@ export default function AddLogEntry() {
               className="w-full p-3 bg-surface text-text-main border border-transparent rounded-lg shadow-sm focus:ring-2 focus:ring-brand focus:outline-none"
             />
           </div>
+          <div className="mb-4 flex flex-wrap gap-2">
+            <SortChip active={sortOption === 'recent'} onClick={() => setSortOption('recent')}>
+              Recently Added
+            </SortChip>
+            <SortChip active={sortOption === 'frequent'} onClick={() => setSortOption('frequent')}>
+              Frequently Used
+            </SortChip>
+            <SortChip active={sortOption === 'protein'} onClick={() => setSortOption('protein')}>
+              Protein Rich
+            </SortChip>
+          </div>
           <div className="space-y-2">
             {rankedSearchResults && rankedSearchResults.length > 0 ? rankedSearchResults.map((food) => {
               const alreadyAdded = mealLogIdsByFood.has(food.id) || addedFoodIds.includes(food.id);
@@ -869,6 +930,16 @@ const StepperBtn = ({ onClick, children }: any) => (
   <button 
     onClick={onClick}
     className="w-12 h-12 rounded-full bg-surface text-text-main text-xl font-bold flex items-center justify-center hover:bg-border-subtle transition-colors"
+  >
+    {children}
+  </button>
+);
+
+const SortChip = ({ active, onClick, children }: any) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${active ? 'bg-brand text-brand-fg' : 'bg-surface text-text-muted border border-border-subtle hover:text-text-main'}`}
   >
     {children}
   </button>

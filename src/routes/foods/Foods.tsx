@@ -2,8 +2,10 @@ import React, { useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Link } from 'react-router-dom';
 import { db } from '../../lib/db';
+import { useStackNavigation } from '../../lib/useStackNavigation';
 
 export default function FoodList() {
+  const { pop } = useStackNavigation();
   const [searchQuery, setSearchQuery] = useState('');
 
   // Subscribe to the foods table
@@ -24,7 +26,17 @@ export default function FoodList() {
     <div className="container mx-auto p-4">
       {/* Header Section */}
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-text-main">Foods</h1>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => pop('/')}
+            className="text-text-muted hover:text-text-main transition-colors"
+            aria-label="Back"
+          >
+            &larr; Back
+          </button>
+          <h1 className="text-2xl font-bold text-text-main">Foods</h1>
+        </div>
         <div className="space-x-2">
           <Link 
             to="/foods/new" 
