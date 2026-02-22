@@ -36,6 +36,15 @@ export function NutritionSection({
   fatGramsDisplay: number;
   macroSum: number;
 }) {
+  const pickNearestHandle = (clientX: number) => {
+    if (!macroTrackRef.current) return;
+    const rect = macroTrackRef.current.getBoundingClientRect();
+    const clickPercent = ((clientX - rect.left) / rect.width) * 100;
+    const distToFirst = Math.abs(clickPercent - macroFirstCut);
+    const distToSecond = Math.abs(clickPercent - macroSecondCut);
+    setDraggingMacroHandle(distToFirst <= distToSecond ? 'first' : 'second');
+  };
+
   return (
     <OptionCard
       title="Nutrition Settings"
@@ -82,14 +91,17 @@ export function NutritionSection({
 
           <div
             ref={macroTrackRef}
-            className="relative h-10 select-none"
+            className="relative h-10 select-none touch-none"
             onMouseDown={(e) => {
-              if (!macroTrackRef.current) return;
-              const rect = macroTrackRef.current.getBoundingClientRect();
-              const clickPercent = ((e.clientX - rect.left) / rect.width) * 100;
-              const distToFirst = Math.abs(clickPercent - macroFirstCut);
-              const distToSecond = Math.abs(clickPercent - macroSecondCut);
-              setDraggingMacroHandle(distToFirst <= distToSecond ? 'first' : 'second');
+              pickNearestHandle(e.clientX);
+            }}
+            onTouchStart={(e) => {
+              const touch = e.touches[0];
+              if (!touch) return;
+              pickNearestHandle(touch.clientX);
+            }}
+            onPointerDown={(e) => {
+              pickNearestHandle(e.clientX);
             }}
           >
             <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-6 rounded-full overflow-hidden border border-border-subtle flex">
@@ -110,7 +122,15 @@ export function NutritionSection({
                 e.stopPropagation();
                 setDraggingMacroHandle('first');
               }}
-              className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 h-6 w-6 rounded-full border border-border-subtle bg-card shadow-sm"
+              onTouchStart={(e) => {
+                e.stopPropagation();
+                setDraggingMacroHandle('first');
+              }}
+              onPointerDown={(e) => {
+                e.stopPropagation();
+                setDraggingMacroHandle('first');
+              }}
+              className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 h-6 w-6 rounded-full border border-border-subtle bg-card shadow-sm touch-none"
               style={{ left: `${macroFirstCut}%` }}
               aria-label="Adjust protein/carbs split"
             />
@@ -121,7 +141,15 @@ export function NutritionSection({
                 e.stopPropagation();
                 setDraggingMacroHandle('second');
               }}
-              className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 h-6 w-6 rounded-full border border-border-subtle bg-card shadow-sm"
+              onTouchStart={(e) => {
+                e.stopPropagation();
+                setDraggingMacroHandle('second');
+              }}
+              onPointerDown={(e) => {
+                e.stopPropagation();
+                setDraggingMacroHandle('second');
+              }}
+              className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 h-6 w-6 rounded-full border border-border-subtle bg-card shadow-sm touch-none"
               style={{ left: `${macroSecondCut}%` }}
               aria-label="Adjust carbs/fat split"
             />

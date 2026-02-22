@@ -275,12 +275,12 @@ export function useProfileSettings() {
   useEffect(() => {
     if (!draggingMacroHandle) return;
 
-    const onMouseMove = (event: MouseEvent) => {
+    const updateFromClientX = (clientX: number) => {
       if (!macroTrackRef.current) return;
       const rect = macroTrackRef.current.getBoundingClientRect();
       if (rect.width <= 0) return;
 
-      const rawPercent = ((event.clientX - rect.left) / rect.width) * 100;
+      const rawPercent = ((clientX - rect.left) / rect.width) * 100;
       const clampedPercent = Math.min(100, Math.max(0, rawPercent));
 
       if (draggingMacroHandle === 'first') {
@@ -290,14 +290,43 @@ export function useProfileSettings() {
       }
     };
 
+    const onMouseMove = (event: MouseEvent) => {
+      updateFromClientX(event.clientX);
+    };
+
+    const onPointerMove = (event: PointerEvent) => {
+      updateFromClientX(event.clientX);
+    };
+
+    const onTouchMove = (event: TouchEvent) => {
+      const touch = event.touches[0];
+      if (!touch) return;
+      event.preventDefault();
+      updateFromClientX(touch.clientX);
+    };
+
     const onMouseUp = () => setDraggingMacroHandle(null);
+    const onPointerUp = () => setDraggingMacroHandle(null);
+    const onTouchEnd = () => setDraggingMacroHandle(null);
 
     window.addEventListener('mousemove', onMouseMove);
     window.addEventListener('mouseup', onMouseUp);
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', onPointerUp);
+    window.addEventListener('touchmove', onTouchMove, { passive: false });
+    window.addEventListener('touchend', onTouchEnd);
+    window.addEventListener('touchcancel', onTouchEnd);
 
     return () => {
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('mouseup', onMouseUp);
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointercancel', onPointerUp);
+      window.removeEventListener('touchmove', onTouchMove);
+      window.removeEventListener('touchend', onTouchEnd);
+      window.removeEventListener('touchcancel', onTouchEnd);
     };
   }, [draggingMacroHandle, macroFirstCut, macroSecondCut]);
 

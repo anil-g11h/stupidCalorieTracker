@@ -1,19 +1,38 @@
 #!/bin/bash
 
-# Exit immediately if a command exits with a non-zero status
-set -e
+set -euo pipefail
+
+INCLUDE_ASSETS=false
+SKIP_INSTALL=false
+
+for arg in "$@"; do
+    case "$arg" in
+        --with-assets)
+            INCLUDE_ASSETS=true
+            ;;
+        --skip-install)
+            SKIP_INSTALL=true
+            ;;
+        *)
+            echo "Unknown option: $arg"
+            echo "Usage: ./deploy.sh [--with-assets] [--skip-install]"
+            exit 1
+            ;;
+    esac
+done
 
 echo "Starting deployment..."
 
-# 1. Install dependencies
-echo "Installing dependencies..."
-npm install
+if [ "$SKIP_INSTALL" = false ]; then
+    echo "Installing dependencies..."
+    npm install
+else
+    echo "Skipping npm install (--skip-install)."
+fi
 
-# 2. Build the project
 echo "Building the project..."
 npm run build
 
-# Identify the build directory (SvelteKit adapter-static uses 'build', Vite uses 'dist')
 if [ -d "build" ]; then
     BUILD_DIR="build"
 elif [ -d "dist" ]; then
@@ -23,33 +42,65 @@ else
     exit 1
 fi
 
-# 3. Commit build folder files to root directory in gh-pages
-echo "Deploying content from $BUILD_DIR to gh-pages branch..."
+WORKTREE_DIR=".deploy-gh-pages"
 
-# Save the remote URL from the root git config
-REMOTE_URL=$(git config --get remote.origin.url)
+cleanup() {
+    if git worktree list | grep -q "$WORKTREE_DIR"; then
+        git worktree remove "$WORKTREE_DIR" --force
+    fi
+}
 
-if [ -z "$REMOTE_URL" ]; then
-    echo "Error: Could not determine remote origin URL."
-    exit 1
+trap cleanup EXIT
+
+echo "Preparing gh-pages worktree..."
+git fetch origin gh-pages || true
+
+if git show-ref --verify --quiet refs/remotes/origin/gh-pages; then
+    git worktree add -B gh-pages "$WORKTREE_DIR" origin/gh-pages
+else
+    echo "gh-pages branch does not exist yet. Initializing it..."
+    git worktree add "$WORKTREE_DIR"
+    (
+        cd "$WORKTREE_DIR"
+        git checkout --orphan gh-pages
+        git rm -rf . >/dev/null 2>&1 || true
+        git commit --allow-empty -m "Initialize gh-pages"
+        git push origin gh-pages
+    )
 fi
 
-# Navigate to the build directory
-cd "$BUILD_DIR"
+echo "Syncing $BUILD_DIR to gh-pages..."
 
-# Initialize a new git repository in the build directory to push just this folder
-# We remove any existing .git directory to ensure a fresh init
-rm -rf .git
-git init
-git checkout -b gh-pages
+RSYNC_ARGS=(
+    -a
+    --delete
+    --exclude ".git/"
+)
 
-# Add all files
-git add -A
+if [ "$INCLUDE_ASSETS" = false ]; then
+    echo "Skipping heavy workout assets (use --with-assets to include them)."
+    RSYNC_ARGS+=(
+        --exclude "workouts/audio/***"
+        --exclude "workouts/images/***"
+        --exclude "workouts/videos/***"
+        --exclude "workouts/media-map.json"
+    )
+fi
 
-# Commit
-git commit -m "Deploy to gh-pages"
+rsync "${RSYNC_ARGS[@]}" "$BUILD_DIR/" "$WORKTREE_DIR/"
 
-# Push to the gh-pages branch on the remote, forcing the update
-git push -f "$REMOTE_URL" gh-pages
+(
+    cd "$WORKTREE_DIR"
+    > .nojekyll
+    git add -A
+
+    if git diff --cached --quiet; then
+        echo "No changes to deploy."
+        exit 0
+    fi
+
+    git commit -m "Deploy to gh-pages"
+    git push origin gh-pages
+)
 
 echo "Deployment complete!"
