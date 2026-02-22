@@ -159,10 +159,13 @@ export interface ActivityLog {
 export interface WorkoutExerciseDef {
   id: string;
   user_id?: string | null;
+  source_id?: string;
   name: string;
   muscle_group?: string;
   secondary_muscle_groups?: string[];
   equipment?: string;
+  video_path?: string;
+  thumbnail_path?: string;
   // 'weight_reps' | 'reps_only' | 'weighted_bodyweight' | 'duration' | 'duration_weight' | 'distance_duration' | 'distance_weight'
   metric_type?: string; 
   created_at?: Date;

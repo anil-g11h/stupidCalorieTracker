@@ -45,6 +45,12 @@ export default function ProfileSettings() {
     toggleMedicalConstraint,
     addCustomAllergy,
     removeCustomAllergy,
+    adaptiveMealPlan,
+    adaptiveMealPlanError,
+    isGeneratingAdaptiveMealPlan,
+    isApplyingAdaptiveMealPlan,
+    generateAdaptiveMealPlanForToday,
+    applyAdaptiveMealPlanToToday,
     saveAllSettings
   } = useProfileSettings();
 
@@ -132,6 +138,12 @@ export default function ProfileSettings() {
             totalMealPercent={totalMealPercent}
             totalMealCalories={totalMealCalories}
             canSaveSettings={canSaveSettings}
+            adaptiveMealPlan={adaptiveMealPlan}
+            adaptiveMealPlanError={adaptiveMealPlanError}
+            isGeneratingAdaptiveMealPlan={isGeneratingAdaptiveMealPlan}
+            isApplyingAdaptiveMealPlan={isApplyingAdaptiveMealPlan}
+            generateAdaptiveMealPlanForToday={generateAdaptiveMealPlanForToday}
+            applyAdaptiveMealPlanToToday={applyAdaptiveMealPlanToToday}
             onRemoveMeal={removeMeal}
             onUpdateMeal={updateMeal}
           />

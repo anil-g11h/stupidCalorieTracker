@@ -11,6 +11,7 @@ import WorkoutList from './routes/workouts/Workouts';
 import WorkoutStart from './routes/workouts/WorkoutStart';
 import WorkoutSessionComponent from './routes/workouts/[id]/WorkoutSession';
 import ExerciseSelector from './routes/workouts/exercises/ExercisesList';
+import ExerciseDetails from './routes/workouts/exercises/ExerciseDetails';
 import NewExercise from './routes/workouts/exercises/new/NewExercise';
 import RoutineEditor from './routes/workouts/routines/RoutineEditor';
 import ProfileAndGoals from './routes/profile/Profile';
@@ -24,12 +25,14 @@ return (
         <Route path="/" element={<Home />} />
         <Route path="/foods" element={<FoodList />} />
         <Route path="/foods/new" element={<NewFood />} />
+        <Route path="/foods/:id/edit" element={<NewFood />} />
         <Route path="/foods/new-recipe" element={<NewRecipe />} />
         <Route path="/workouts" element={<WorkoutList />} />
         <Route path="/workouts/start" element={<WorkoutStart />} />
         <Route path="/workouts/routines/:id" element={<RoutineEditor />} />
         <Route path="/workouts/:id" element={<WorkoutSessionComponent />} />
         <Route path="/workouts/exercises" element={<ExerciseSelector />} />
+        <Route path="/workouts/exercises/:id" element={<ExerciseDetails />} />
         <Route path="/workouts/exercises/new" element={<NewExercise />} />
         <Route path="/profile" element={<ProfileAndGoals />} />
 

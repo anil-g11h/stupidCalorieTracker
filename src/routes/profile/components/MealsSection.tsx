@@ -8,6 +8,7 @@ import {
   type MealTargetMode,
   type MealTimingAdvice
 } from '../mealPlanning';
+import { type AdaptiveMealPlan } from '../adaptiveMealPlanner';
 import { Field, OptionCard } from './ProfileSectionPrimitives';
 
 const toNonNegativeNumber = (value: number, fallback = 0) => {
@@ -16,6 +17,70 @@ const toNonNegativeNumber = (value: number, fallback = 0) => {
 };
 
 const round1 = (value: number) => Math.round(value * 10) / 10;
+
+function PlannerMetric({ label, value, isGood }: { label: string; value: string; isGood: boolean }) {
+  return (
+    <div className="rounded-lg border border-border-subtle bg-surface px-2.5 py-2">
+      <div className="text-[10px] uppercase tracking-wide text-text-muted font-bold">{label}</div>
+      <div className="mt-1 flex items-center justify-between gap-2">
+        <div className="text-xs font-bold text-text-main">{value}</div>
+        <span className={`text-[10px] font-bold ${isGood ? 'text-brand' : 'text-text-muted'}`}>
+          {isGood ? '✓ ±10%' : 'Adjust'}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function AdaptiveMealPlanCard({ plan }: { plan: AdaptiveMealPlan }) {
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-2">
+        <PlannerMetric
+          label="Calories"
+          value={`${round1(plan.summary.plannedCalories)} / ${round1(plan.summary.targetCalories)}`}
+          isGood={plan.summary.caloriesWithin10Percent}
+        />
+        <PlannerMetric
+          label="Protein (g)"
+          value={`${round1(plan.summary.plannedProtein)} / ${round1(plan.summary.targetProtein)}`}
+          isGood={plan.summary.proteinWithin10Percent}
+        />
+        <PlannerMetric
+          label="Carbs (g)"
+          value={`${round1(plan.summary.plannedCarbs)} / ${round1(plan.summary.targetCarbs)}`}
+          isGood={plan.summary.carbsWithin10Percent}
+        />
+        <PlannerMetric
+          label="Fat (g)"
+          value={`${round1(plan.summary.plannedFat)} / ${round1(plan.summary.targetFat)}`}
+          isGood={plan.summary.fatWithin10Percent}
+        />
+      </div>
+
+      <div className="text-xs rounded-xl px-3 py-2 border bg-surface border-border-subtle text-text-main">
+        <span className="font-semibold">Dietary filter pass rate:</span> {round1(plan.dietaryPassRate)}%
+      </div>
+
+      <div className="space-y-2">
+        {plan.meals.map((meal) => (
+          <div key={meal.mealId} className="rounded-xl border border-border-subtle bg-surface px-3 py-2">
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-sm font-bold text-text-main">{meal.mealName}</div>
+              <div className="text-[11px] text-text-muted">{meal.mealTime}</div>
+            </div>
+            <div className="text-[11px] text-text-muted mt-0.5">
+              {meal.items.map((item) => `${item.foodName} × ${round1(item.quantity)}`).join(' + ')}
+            </div>
+            <div className="text-[11px] text-text-muted mt-0.5">
+              {round1(meal.totals.calories)} cal • P {round1(meal.totals.protein)}g • C {round1(meal.totals.carbs)}g • F {round1(meal.totals.fat)}g
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function FastingWindowCard({ hint }: { hint: FastingWindowHint }) {
   return (
@@ -150,6 +215,12 @@ export function MealsSection({
   totalMealPercent,
   totalMealCalories,
   canSaveSettings,
+  adaptiveMealPlan,
+  adaptiveMealPlanError,
+  isGeneratingAdaptiveMealPlan,
+  isApplyingAdaptiveMealPlan,
+  generateAdaptiveMealPlanForToday,
+  applyAdaptiveMealPlanToToday,
   onRemoveMeal,
   onUpdateMeal
 }: {
@@ -169,6 +240,12 @@ export function MealsSection({
   totalMealPercent: number;
   totalMealCalories: number;
   canSaveSettings: boolean;
+  adaptiveMealPlan: AdaptiveMealPlan | null;
+  adaptiveMealPlanError: string | null;
+  isGeneratingAdaptiveMealPlan: boolean;
+  isApplyingAdaptiveMealPlan: boolean;
+  generateAdaptiveMealPlanForToday: () => Promise<void>;
+  applyAdaptiveMealPlanToToday: () => Promise<void>;
   onRemoveMeal: (mealId: string) => void;
   onUpdateMeal: (mealId: string, patch: Partial<MealSetting>) => void;
 }) {
@@ -275,6 +352,43 @@ export function MealsSection({
               Warning: Meal totals must equal 100% and {dailyCalorieBudget} Cal to save settings.
             </p>
           )}
+        </div>
+
+        <div className="pt-2 border-t border-border-subtle space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <h4 className="text-sm font-bold text-text-main">Adaptive Meal Planner</h4>
+              <p className="text-xs text-text-muted">Generate a full-day plan from your calorie/macro and dietary settings.</p>
+            </div>
+            <button
+              type="button"
+              onClick={generateAdaptiveMealPlanForToday}
+              disabled={isGeneratingAdaptiveMealPlan}
+              className="px-3 py-1.5 rounded-full text-xs font-bold bg-brand text-brand-fg hover:opacity-90 transition-opacity disabled:opacity-60"
+            >
+              {isGeneratingAdaptiveMealPlan ? 'Generating...' : 'Generate Plan'}
+            </button>
+          </div>
+
+          {adaptiveMealPlanError ? (
+            <div className="text-xs rounded-xl px-3 py-2 border bg-macro-fat/10 border-macro-fat/30 text-text-main">
+              {adaptiveMealPlanError}
+            </div>
+          ) : null}
+
+          {adaptiveMealPlan ? (
+            <>
+              <AdaptiveMealPlanCard plan={adaptiveMealPlan} />
+              <button
+                type="button"
+                onClick={applyAdaptiveMealPlanToToday}
+                disabled={isApplyingAdaptiveMealPlan}
+                className="w-full py-2.5 rounded-xl bg-surface text-text-main border border-border-subtle text-sm font-bold hover:bg-card transition-colors disabled:opacity-60"
+              >
+                {isApplyingAdaptiveMealPlan ? 'Adding to log...' : 'Add Plan to Today\'s Log'}
+              </button>
+            </>
+          ) : null}
         </div>
       </div>
     </OptionCard>

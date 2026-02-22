@@ -393,11 +393,72 @@ export function useWorkoutSession(workoutId: string | null, isEditingCompleted =
         const endTime = new Date(startMs + safeDurationMinutes * 60 * 1000).toISOString();
 
         try {
-            await db.workouts.update(resolvedWorkoutId, {
-                name: title.trim() || workout.name || 'Workout',
-                notes: description.trim() || undefined,
-                end_time: endTime,
-                synced: 0
+            await db.transaction('rw', [db.workouts, db.workout_log_entries, db.workout_sets], async () => {
+                const sourceEntries = await db.workout_log_entries
+                    .where('workout_id')
+                    .equals(resolvedWorkoutId)
+                    .sortBy('sort_order');
+
+                const sourceEntryIds = sourceEntries.map((entry) => entry.id);
+                const sourceSets = sourceEntryIds.length
+                    ? await db.workout_sets.where('workout_log_entry_id').anyOf(sourceEntryIds).toArray()
+                    : [];
+
+                const completedSetsByEntryId = sourceSets.reduce<Record<string, typeof sourceSets>>((acc, set) => {
+                    if (!set.completed) return acc;
+                    if (!acc[set.workout_log_entry_id]) acc[set.workout_log_entry_id] = [];
+                    acc[set.workout_log_entry_id].push(set);
+                    return acc;
+                }, {});
+
+                const keepEntryIds = new Set(Object.keys(completedSetsByEntryId));
+                const removeEntryIds = sourceEntries
+                    .filter((entry) => !keepEntryIds.has(entry.id))
+                    .map((entry) => entry.id);
+
+                if (removeEntryIds.length) {
+                    await db.workout_sets.where('workout_log_entry_id').anyOf(removeEntryIds).delete();
+                    await db.workout_log_entries.where('id').anyOf(removeEntryIds).delete();
+                }
+
+                const keepEntries = sourceEntries.filter((entry) => keepEntryIds.has(entry.id));
+
+                for (let entryIndex = 0; entryIndex < keepEntries.length; entryIndex += 1) {
+                    const entry = keepEntries[entryIndex];
+                    const nextSortOrder = entryIndex + 1;
+                    if (entry.sort_order !== nextSortOrder) {
+                        await db.workout_log_entries.update(entry.id, { sort_order: nextSortOrder, synced: 0 });
+                    }
+
+                    const completedSets = (completedSetsByEntryId[entry.id] || []).sort((a, b) => a.set_number - b.set_number);
+                    const keepSetIds = new Set(completedSets.map((set) => set.id));
+                    const removeSetIds = sourceSets
+                        .filter((set) => set.workout_log_entry_id === entry.id && !keepSetIds.has(set.id))
+                        .map((set) => set.id);
+
+                    if (removeSetIds.length) {
+                        await db.workout_sets.where('id').anyOf(removeSetIds).delete();
+                    }
+
+                    for (let setIndex = 0; setIndex < completedSets.length; setIndex += 1) {
+                        const set = completedSets[setIndex];
+                        const nextSetNumber = setIndex + 1;
+                        if (set.set_number !== nextSetNumber || !set.completed) {
+                            await db.workout_sets.update(set.id, {
+                                set_number: nextSetNumber,
+                                completed: true,
+                                synced: 0,
+                            });
+                        }
+                    }
+                }
+
+                await db.workouts.update(resolvedWorkoutId, {
+                    name: title.trim() || workout.name || 'Workout',
+                    notes: description.trim() || undefined,
+                    end_time: endTime,
+                    synced: 0
+                });
             });
 
             if (!stayOnPage) {
@@ -486,13 +547,115 @@ export function useWorkoutSession(workoutId: string | null, isEditingCompleted =
         }
     };
 
+    const saveWorkoutAsRoutine = async () => {
+        if (!resolvedWorkoutId || !workout) return;
+
+        try {
+            const sourceEntries = await db.workout_log_entries
+                .where('workout_id')
+                .equals(resolvedWorkoutId)
+                .sortBy('sort_order');
+
+            if (!sourceEntries.length) {
+                alert('No exercises to save as routine.');
+                return;
+            }
+
+            const sourceEntryIds = sourceEntries.map((entry) => entry.id);
+            const sourceSets = sourceEntryIds.length
+                ? await db.workout_sets.where('workout_log_entry_id').anyOf(sourceEntryIds).toArray()
+                : [];
+
+            const setsByEntryId = sourceSets.reduce<Record<string, typeof sourceSets>>((acc, set) => {
+                if (!acc[set.workout_log_entry_id]) acc[set.workout_log_entry_id] = [];
+                acc[set.workout_log_entry_id].push(set);
+                return acc;
+            }, {});
+
+            Object.values(setsByEntryId).forEach((entrySets) => {
+                entrySets.sort((a, b) => a.set_number - b.set_number);
+            });
+
+            const now = new Date();
+            const routineId = generateId();
+            const baseName = (workout.name || 'Workout').trim() || 'Workout';
+
+            await db.transaction('rw', [db.workout_routines, db.workout_routine_entries, db.workout_routine_sets], async () => {
+                await db.workout_routines.add({
+                    id: routineId,
+                    user_id: workout.user_id || 'local-user',
+                    name: `${baseName} Routine`,
+                    notes: workout.notes,
+                    created_at: now,
+                    updated_at: now,
+                    synced: 0,
+                });
+
+                for (const entry of sourceEntries) {
+                    const routineEntryId = generateId();
+                    await db.workout_routine_entries.add({
+                        id: routineEntryId,
+                        routine_id: routineId,
+                        exercise_id: entry.exercise_id,
+                        sort_order: entry.sort_order,
+                        notes: entry.notes,
+                        created_at: now,
+                        synced: 0,
+                    });
+
+                    const copiedSets = setsByEntryId[entry.id] || [];
+                    for (const copiedSet of copiedSets) {
+                        await db.workout_routine_sets.add({
+                            id: generateId(),
+                            routine_entry_id: routineEntryId,
+                            set_number: copiedSet.set_number,
+                            weight: copiedSet.weight,
+                            reps_min: copiedSet.reps,
+                            reps_max: copiedSet.reps,
+                            distance: copiedSet.distance,
+                            duration_seconds: copiedSet.duration_seconds,
+                            created_at: now,
+                            synced: 0,
+                        });
+                    }
+                }
+            });
+
+            alert('Workout saved as routine.');
+        } catch (error) {
+            console.error('Failed to save workout as routine:', error);
+            alert('Error saving routine.');
+        }
+    };
+
+    const deleteWorkout = async () => {
+        if (!resolvedWorkoutId) return;
+        if (!window.confirm('Delete this workout? This cannot be undone.')) return;
+
+        try {
+            await db.transaction('rw', [db.workouts, db.workout_log_entries, db.workout_sets], async () => {
+                const entryIds = (await db.workout_log_entries.where('workout_id').equals(resolvedWorkoutId).toArray()).map((entry) => entry.id);
+                if (entryIds.length) {
+                    await db.workout_sets.where('workout_log_entry_id').anyOf(entryIds).delete();
+                }
+                await db.workout_log_entries.where('workout_id').equals(resolvedWorkoutId).delete();
+                await db.workouts.delete(resolvedWorkoutId);
+            });
+
+            pop('/workouts');
+        } catch (error) {
+            console.error('Failed to delete workout:', error);
+            alert('Error deleting workout.');
+        }
+    };
+
     return {
         workout, exercises, definitions, sets, totalStats,
         elapsedTime, activeRestTimer, expandedMenuId,
         setExpandedMenuId, handleAddSet, cancelWorkout,
         adjustRestTimer, skipRestTimer, navigateToAddExercises,
         handleRemoveExercise, handleReorderExercise, navigateToReplaceExercise,
-        requestFinishWorkout, saveFinishedWorkout, copyWorkout, handleToggleSet,
+        requestFinishWorkout, saveFinishedWorkout, copyWorkout, saveWorkoutAsRoutine, deleteWorkout, handleToggleSet,
         restPreferences: restPreferences || {}, setExerciseRestPreference, barRef,
     };
 }

@@ -4,9 +4,25 @@ import { useStackNavigation } from '../useStackNavigation'; // adjust path
 
 const TAB_ORDER = ['/', '/log', '/workouts', '/profile'];
 
+const TAB_MATCHERS: Record<string, string[]> = {
+    '/': ['/'],
+    '/log': ['/log', '/foods'],
+    '/workouts': ['/workouts'],
+    '/profile': ['/profile'],
+};
+
+const isPathMatch = (pathname: string, basePath: string) => {
+    if (basePath === '/') return pathname === '/';
+    return pathname === basePath || pathname.startsWith(`${basePath}/`);
+};
+
+const resolveActiveTab = (pathname: string) =>
+    TAB_ORDER.find((tabPath) => TAB_MATCHERS[tabPath].some((matchPath) => isPathMatch(pathname, matchPath))) ?? null;
+
 export default function BottomNav() {
     const location = useLocation();
     const { goToTab } = useStackNavigation();
+    const activeTab = resolveActiveTab(location.pathname);
 
     const handleTabClick = (newPath: string) => {
         if (location.pathname === newPath) {
@@ -14,17 +30,16 @@ export default function BottomNav() {
             return;
         }
 
-        const currentIndex = TAB_ORDER.indexOf(location.pathname);
+        const currentIndex = TAB_ORDER.indexOf(activeTab ?? location.pathname);
         const nextIndex = TAB_ORDER.indexOf(newPath);
 
-        const isExitingSubPage = location.pathname.includes(newPath) && location.pathname !== newPath;
-        const direction = isExitingSubPage || currentIndex === -1 ? 'backward' : (nextIndex > currentIndex ? 'forward' : 'backward');
+        const direction = currentIndex === -1 ? 'backward' : (nextIndex > currentIndex ? 'forward' : 'backward');
 
         goToTab(newPath, direction);
     };
 
     const getBtnStyle = (path: string) =>
-        `flex-1 flex items-center justify-center py-4 transition-colors ${location.pathname === path ? 'text-blue-600' : 'text-gray-600'
+        `flex-1 flex items-center justify-center py-4 transition-colors ${activeTab === path ? 'text-blue-600' : 'text-gray-600'
         } hover:bg-gray-50 active:bg-gray-100`;
 
     return (

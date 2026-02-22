@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { PlusIcon, TrashIcon, CaretLeftIcon } from '@phosphor-icons/react';
 import { db, type WorkoutExerciseDef, type WorkoutRoutineSet } from '../../../lib/db';
 import { generateId } from '../../../lib';
@@ -9,40 +9,128 @@ import { DurationScrollerInput, getMetricColumns, type MetricField } from '../co
 
 export default function RoutineEditor() {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
   const routineId = id === 'new' ? null : (id || null);
+  const fromWorkoutId = searchParams.get('fromWorkoutId');
   const navigate = useNavigate();
   const { push, pop } = useStackNavigation();
 
   const [resolvedRoutineId, setResolvedRoutineId] = useState<string | null>(routineId);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDraftFromWorkout, setIsDraftFromWorkout] = useState(false);
+  const [hasSavedRoutine, setHasSavedRoutine] = useState(false);
 
   useEffect(() => {
     setResolvedRoutineId(routineId);
+    setIsDraftFromWorkout(false);
+    setHasSavedRoutine(false);
   }, [routineId]);
+
+  const cloneWorkoutIntoRoutine = useCallback(async (sourceWorkoutId: string, targetRoutineId: string) => {
+    const sourceEntries = await db.workout_log_entries
+      .where('workout_id')
+      .equals(sourceWorkoutId)
+      .sortBy('sort_order');
+
+    if (!sourceEntries.length) return;
+
+    const sourceEntryIds = sourceEntries.map((entry) => entry.id);
+    const sourceSets = sourceEntryIds.length
+      ? await db.workout_sets.where('workout_log_entry_id').anyOf(sourceEntryIds).toArray()
+      : [];
+
+    const setsByEntryId = sourceSets.reduce<Record<string, typeof sourceSets>>((acc, set) => {
+      if (!acc[set.workout_log_entry_id]) acc[set.workout_log_entry_id] = [];
+      acc[set.workout_log_entry_id].push(set);
+      return acc;
+    }, {});
+
+    Object.values(setsByEntryId).forEach((entrySets) => {
+      entrySets.sort((a, b) => a.set_number - b.set_number);
+    });
+
+    const now = new Date();
+    for (const entry of sourceEntries) {
+      const routineEntryId = generateId();
+      await db.workout_routine_entries.add({
+        id: routineEntryId,
+        routine_id: targetRoutineId,
+        exercise_id: entry.exercise_id,
+        sort_order: entry.sort_order,
+        notes: entry.notes,
+        created_at: now,
+        synced: 0,
+      });
+
+      const copiedSets = setsByEntryId[entry.id] || [];
+      for (const copiedSet of copiedSets) {
+        await db.workout_routine_sets.add({
+          id: generateId(),
+          routine_entry_id: routineEntryId,
+          set_number: copiedSet.set_number,
+          weight: copiedSet.weight,
+          reps_min: copiedSet.reps,
+          reps_max: copiedSet.reps,
+          distance: copiedSet.distance,
+          duration_seconds: copiedSet.duration_seconds,
+          created_at: now,
+          synced: 0,
+        });
+      }
+    }
+  }, []);
 
   const ensureRoutineExists = useCallback(async () => {
     if (resolvedRoutineId) return resolvedRoutineId;
 
     const newRoutineId = generateId();
     const now = new Date();
+    let nextName = 'New Routine';
+
+    if (fromWorkoutId) {
+      const sourceWorkout = await db.workouts.get(fromWorkoutId);
+      const sourceName = sourceWorkout?.name?.trim() || 'Workout';
+      nextName = `${sourceName} Routine`;
+    }
+
     await db.workout_routines.add({
       id: newRoutineId,
       user_id: 'local-user',
-      name: 'New Routine',
+      name: nextName,
       created_at: now,
       updated_at: now,
       synced: 0,
     });
 
+    if (fromWorkoutId) {
+      await cloneWorkoutIntoRoutine(fromWorkoutId, newRoutineId);
+      setIsDraftFromWorkout(true);
+    }
+
     setResolvedRoutineId(newRoutineId);
     navigate(`/workouts/routines/${newRoutineId}`, { replace: true });
     return newRoutineId;
-  }, [navigate, resolvedRoutineId]);
+  }, [cloneWorkoutIntoRoutine, fromWorkoutId, navigate, resolvedRoutineId]);
 
   useEffect(() => {
     if (routineId) return;
     void ensureRoutineExists();
   }, [routineId, ensureRoutineExists]);
+
+  useEffect(() => {
+    return () => {
+      if (!resolvedRoutineId || !isDraftFromWorkout || hasSavedRoutine) return;
+
+      void db.transaction('rw', [db.workout_routines, db.workout_routine_entries, db.workout_routine_sets], async () => {
+        const entryIds = (await db.workout_routine_entries.where('routine_id').equals(resolvedRoutineId).toArray()).map((entry) => entry.id);
+        if (entryIds.length) {
+          await db.workout_routine_sets.where('routine_entry_id').anyOf(entryIds).delete();
+        }
+        await db.workout_routine_entries.where('routine_id').equals(resolvedRoutineId).delete();
+        await db.workout_routines.delete(resolvedRoutineId);
+      });
+    };
+  }, [hasSavedRoutine, isDraftFromWorkout, resolvedRoutineId]);
 
   const routine = useLiveQuery(
     () => (resolvedRoutineId ? db.workout_routines.get(resolvedRoutineId) : undefined),
@@ -170,6 +258,8 @@ export default function RoutineEditor() {
         updated_at: new Date(),
         synced: 0,
       });
+
+      setHasSavedRoutine(true);
 
       pop('/workouts');
     } catch (error) {

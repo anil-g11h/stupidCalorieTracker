@@ -292,6 +292,35 @@ export class SyncManager {
         return match?.[1] ?? null;
     }
 
+    private normalizeDottedPayloadKeys(input: Record<string, any>) {
+        const output: Record<string, any> = { ...input };
+
+        const setByPath = (target: Record<string, any>, path: string, value: any) => {
+            const keys = path.split('.').filter(Boolean);
+            if (keys.length === 0) return;
+
+            let cursor: Record<string, any> = target;
+            for (let i = 0; i < keys.length - 1; i++) {
+                const key = keys[i];
+                const existing = cursor[key];
+                if (typeof existing !== 'object' || existing === null || Array.isArray(existing)) {
+                    cursor[key] = {};
+                }
+                cursor = cursor[key];
+            }
+
+            cursor[keys[keys.length - 1]] = value;
+        };
+
+        Object.entries(input).forEach(([key, value]) => {
+            if (!key.includes('.')) return;
+            delete output[key];
+            setByPath(output, key, value);
+        });
+
+        return output;
+    }
+
   private async processQueueItem(item: SyncQueue, session: any) {
     const { table, action, data } = item;
         const tablesWithUserId = new Set([
@@ -342,7 +371,8 @@ export class SyncManager {
     }
 
     // For create/update, we need to clean the data (remove local-only fields if any)
-    const { synced, ...payload } = data;
+    const { synced, ...rawPayload } = data;
+    let payload = this.normalizeDottedPayloadKeys(rawPayload as Record<string, any>);
 
         if (
             table === 'workout_log_entries' &&
@@ -407,19 +437,25 @@ export class SyncManager {
     };
 
         const executeCreate = async () => {
-            let { error } = await supabase.from(supabaseTable).insert(payload);
+            let { error } = await supabase
+                .from(supabaseTable)
+                .upsert(payload, { onConflict: 'id' });
 
             if (error && shouldRetryWithoutUserId(error)) {
-                console.warn(`[SyncManager] Retrying ${supabaseTable} insert without user_id due to schema mismatch`);
+                console.warn(`[SyncManager] Retrying ${supabaseTable} upsert without user_id due to schema mismatch`);
                 delete payload.user_id;
-                ({ error } = await supabase.from(supabaseTable).insert(payload));
+                ({ error } = await supabase
+                    .from(supabaseTable)
+                    .upsert(payload, { onConflict: 'id' }));
             }
 
             let missingColumn = this.getMissingColumnFromError(error);
             while (error && missingColumn && Object.prototype.hasOwnProperty.call(payload, missingColumn)) {
-                console.warn(`[SyncManager] Retrying ${supabaseTable} insert without missing column ${missingColumn}`);
+                console.warn(`[SyncManager] Retrying ${supabaseTable} upsert without missing column ${missingColumn}`);
                 delete payload[missingColumn];
-                ({ error } = await supabase.from(supabaseTable).insert(payload));
+                ({ error } = await supabase
+                    .from(supabaseTable)
+                    .upsert(payload, { onConflict: 'id' }));
                 missingColumn = this.getMissingColumnFromError(error);
             }
 

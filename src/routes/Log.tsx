@@ -64,6 +64,11 @@ interface MealSection {
   logs: ExtendedLog[];
 }
 
+interface MoveMealOption {
+  id: string;
+  label: string;
+}
+
 type NutrientUnit = 'mg' | 'mcg' | 'IU';
 
 interface NutrientTarget {
@@ -378,11 +383,31 @@ function resolveMealTargetKcal(
   return Math.round(meal.targetValue);
 }
 
+function parseMealTimeToMinutes(time?: string): number | null {
+  if (!time) return null;
+  const match = /^(\d{1,2}):(\d{2})$/.exec(time.trim());
+  if (!match) return null;
+
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null;
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
+
+  return hours * 60 + minutes;
+}
+
+function circularMinuteDistance(a: number, b: number): number {
+  const diff = Math.abs(a - b);
+  return Math.min(diff, 1440 - diff);
+}
+
 export default function DailyLogPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [settings, setSettings] = useState<TrackerSettings | null>(() => readSettingsFromLocalStorage());
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [showMicronutrients, setShowMicronutrients] = useState(false);
+  const [timeTick, setTimeTick] = useState(() => Date.now());
+  const [openActionsLogId, setOpenActionsLogId] = useState<string | null>(null);
 
   const date = searchParams.get('date') || new Date().toISOString().split('T')[0];
   const isToday = date === new Date().toISOString().split('T')[0];
@@ -411,6 +436,18 @@ export default function DailyLogPage() {
       window.removeEventListener('focus', handleRefresh);
     };
   }, []);
+
+  useEffect(() => {
+    if (!isToday) return;
+
+    const interval = window.setInterval(() => {
+      setTimeTick(Date.now());
+    }, 60_000);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [isToday]);
 
   const displayDate = useMemo(
     () =>
@@ -593,7 +630,7 @@ export default function DailyLogPage() {
   const mealSections = useMemo<MealSection[]>(() => {
     const matchedLogIds = new Set<string>();
 
-    const configuredSections: MealSection[] = mealDefinitions.map((meal) => {
+    const configuredSectionsWithOrder = mealDefinitions.map((meal, index) => {
       const logs = extendedLogs.filter((log) => {
         const logMeal = normalizeKey(log.meal_type || '');
         const isMatch = meal.aliases.has(logMeal);
@@ -602,13 +639,32 @@ export default function DailyLogPage() {
       });
 
       return {
-        id: meal.id,
-        label: meal.name,
-        time: meal.time,
-        targetKcal: resolveMealTargetKcal(meal, goals.calories),
-        logs
+        order: index,
+        section: {
+          id: meal.id,
+          label: meal.name,
+          time: meal.time,
+          targetKcal: resolveMealTargetKcal(meal, goals.calories),
+          logs
+        } satisfies MealSection
       };
     });
+
+    const configuredSections: MealSection[] = configuredSectionsWithOrder
+      .sort((a, b) => {
+        const aMinutes = parseMealTimeToMinutes(a.section.time);
+        const bMinutes = parseMealTimeToMinutes(b.section.time);
+
+        if (aMinutes !== null && bMinutes !== null) {
+          return aMinutes - bMinutes;
+        }
+
+        if (aMinutes !== null) return -1;
+        if (bMinutes !== null) return 1;
+
+        return a.order - b.order;
+      })
+      .map((item) => item.section);
 
     const legacyMealTypes = [...new Set(
       extendedLogs
@@ -626,10 +682,82 @@ export default function DailyLogPage() {
     return [...configuredSections, ...legacySections];
   }, [extendedLogs, mealDefinitions, goals.calories]);
 
+  const highlightedMealId = useMemo(() => {
+    if (!isToday) return null;
+
+    const now = new Date(timeTick);
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    let closestMealId: string | null = null;
+    let closestDistance = Number.POSITIVE_INFINITY;
+
+    mealSections.forEach((meal) => {
+      const mealMinutes = parseMealTimeToMinutes(meal.time);
+      if (mealMinutes === null) return;
+
+      const distance = circularMinuteDistance(currentMinutes, mealMinutes);
+      if (distance < closestDistance) {
+        closestDistance = distance;
+        closestMealId = meal.id;
+      }
+    });
+
+    return closestDistance <= 120 ? closestMealId : null;
+  }, [isToday, mealSections, timeTick]);
+
+  const moveMealOptions = useMemo<MoveMealOption[]>(() => {
+    const options: MoveMealOption[] = [];
+    const seen = new Set<string>();
+
+    mealDefinitions.forEach((meal) => {
+      const key = normalizeKey(meal.id);
+      if (seen.has(key)) return;
+      seen.add(key);
+      options.push({ id: meal.id, label: meal.name });
+    });
+
+    mealSections.forEach((meal) => {
+      const key = normalizeKey(meal.id);
+      if (seen.has(key)) return;
+      seen.add(key);
+      options.push({ id: meal.id, label: meal.label });
+    });
+
+    return options;
+  }, [mealDefinitions, mealSections]);
+
   const deleteLog = async (id: string) => {
     if (window.confirm('Delete this entry?')) {
+      setOpenActionsLogId(null);
       await db.logs.delete(id);
     }
+  };
+
+  const moveLogToMeal = async (log: ExtendedLog) => {
+    const currentMeal = normalizeKey(log.meal_type || '');
+    const candidates = moveMealOptions.filter((option) => normalizeKey(option.id) !== currentMeal);
+
+    if (!candidates.length) {
+      alert('No other meal available to move this item.');
+      return;
+    }
+
+    const optionsText = candidates.map((option, index) => `${index + 1}. ${option.label}`).join('\n');
+    const selected = window.prompt(`Move to which meal?\n\n${optionsText}\n\nEnter number:`);
+
+    if (!selected) return;
+
+    const selectedIndex = Number.parseInt(selected, 10) - 1;
+    if (!Number.isInteger(selectedIndex) || selectedIndex < 0 || selectedIndex >= candidates.length) {
+      alert('Invalid selection.');
+      return;
+    }
+
+    await db.logs.update(log.id, {
+      meal_type: candidates[selectedIndex].id,
+      synced: 0
+    });
+
+    setOpenActionsLogId(null);
   };
 
   return (
@@ -941,7 +1069,7 @@ export default function DailyLogPage() {
                   return (
                     <div
                       key={log.id}
-                      className="bg-card p-4 rounded-xl shadow-sm border border-border-subtle flex justify-between items-center"
+                      className="bg-card p-4 rounded-xl shadow-sm border border-border-subtle flex justify-between items-start relative"
                     >
                       <div className="flex-1 min-w-0 pr-2">
                         <div className="font-medium text-text-main truncate">
@@ -961,19 +1089,53 @@ export default function DailyLogPage() {
                           </div>
                         </div>
                       </div>
-                      <button
-                        onClick={() => deleteLog(log.id)}
-                        className="text-text-muted hover:text-red-500 p-2 transition-colors text-2xl"
-                      >
-                        &times;
-                      </button>
+                      <div className="shrink-0 relative">
+                        <button
+                          type="button"
+                          onClick={() => setOpenActionsLogId((current) => (current === log.id ? null : log.id))}
+                          className="w-8 h-8 rounded-full border border-border-subtle bg-surface text-text-muted hover:text-text-main hover:border-brand transition-colors flex items-center justify-center"
+                          aria-label="Open food log actions"
+                        >
+                          ⋯
+                        </button>
+
+                        {openActionsLogId === log.id && (
+                          <div className="absolute right-0 top-9 z-20 min-w-28 bg-card border border-border-subtle rounded-lg shadow-sm py-1">
+                            <Link
+                              to={`/log/add?date=${date}&meal=${encodeURIComponent(log.meal_type || meal.id)}&log_id=${log.id}`}
+                              onClick={() => setOpenActionsLogId(null)}
+                              className="block px-3 py-1.5 text-[11px] font-semibold text-brand hover:bg-surface"
+                            >
+                              Edit qty
+                            </Link>
+                            <button
+                              type="button"
+                              onClick={() => moveLogToMeal(log)}
+                              className="w-full text-left px-3 py-1.5 text-[11px] font-semibold text-text-main hover:bg-surface"
+                            >
+                              Move
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => deleteLog(log.id)}
+                              className="w-full text-left px-3 py-1.5 text-[11px] font-semibold text-red-500 hover:bg-surface"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
 
                 <Link
                   to={`/log/add?date=${date}&meal=${encodeURIComponent(meal.id)}`}
-                  className="block w-full text-center py-3 border-2 border-dashed border-border-subtle rounded-xl text-text-muted hover:border-brand hover:text-brand hover:bg-surface transition-all text-sm font-medium"
+                  className={`block w-full text-center py-3 border-2 rounded-xl hover:border-brand hover:text-brand hover:bg-surface transition-all text-sm font-medium ${
+                    highlightedMealId === meal.id
+                      ? 'border-brand bg-surface text-brand add-food-time-highlight'
+                      : 'border-dashed border-border-subtle text-text-muted'
+                  }`}
                 >
                   + Add Food
                 </Link>

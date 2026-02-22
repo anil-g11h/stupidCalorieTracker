@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 // import { 
 //   Plus, Check, Trash, MoreVertical, Settings, Timer, ChevronDown 
@@ -7,9 +7,11 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import {
   PlusIcon as Plus,
   CheckIcon as Check,
+  CopyIcon as Copy,
+  FloppyDiskIcon as Save,
   TrashIcon as Trash,
   DotsThreeVerticalIcon as MoreVertical,
-  GearSixIcon as Settings,
+  PencilSimpleIcon as Edit,
   TimerIcon as Timer,
   CaretDownIcon as ChevronDown,
   BarbellIcon as Dumbbell
@@ -36,6 +38,39 @@ const StatItem = ({ label, value, border }: { label: string, value: string | num
     {label}
   </div>
 );
+
+const toWorkoutMediaUrl = (path?: string | null) => {
+  if (!path) return '';
+  const base = import.meta.env.BASE_URL || '/';
+  const normalizedBase = base.endsWith('/') ? base : `${base}/`;
+  return `${normalizedBase}${path.replace(/^\/+/, '')}`;
+};
+
+type WorkoutMediaEntry = {
+  sourceId: string;
+  videoPath: string;
+  thumbnailPath: string | null;
+};
+
+type WorkoutMediaMap = {
+  media?: WorkoutMediaEntry[];
+};
+
+const normalizeName = (value: string) =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const mediaNameFromVideoPath = (videoPath: string) => {
+  const file = videoPath.split('/').pop() || videoPath;
+  const noExt = file.replace(/\.mp4$/i, '');
+  const noPrefix = noExt.replace(/^\d+-/, '');
+  const noSuffix = noPrefix.replace(/-(chest|back|thighs|shoulders|shoulder|upper-arms|lower-arms|waist|hips|calves|plyometrics)$/i, '');
+  const noGender = noSuffix.replace(/-(female|male)$/i, '');
+  return normalizeName(noGender.replace(/-/g, ' '));
+};
 
 
 
@@ -194,12 +229,14 @@ const CompletedWorkoutView = ({
   exercises,
   definitions,
   sets,
+  mediaFallbackByExerciseId,
 }: {
   workout?: Workout;
   elapsedTime: string;
   exercises?: WorkoutLogEntry[];
   definitions?: Record<string, WorkoutExerciseDef>;
   sets?: Record<string, WorkoutSet[]>;
+  mediaFallbackByExerciseId?: Record<string, { videoPath?: string; thumbnailPath?: string }>;
 }) => (
   <div className="space-y-4">
     {workout?.notes?.trim() ? (
@@ -212,27 +249,57 @@ const CompletedWorkoutView = ({
     <div className="space-y-3">
       {exercises?.map((exercise) => {
         const definition = definitions?.[exercise.exercise_id];
-        const completedSets = (sets?.[exercise.id] || []).filter((set) => set.completed);
-        if (completedSets.length === 0) return null;
+        const fallbackMedia = mediaFallbackByExerciseId?.[exercise.exercise_id];
+        const headerThumbnailUrl = toWorkoutMediaUrl(definition?.thumbnail_path || fallbackMedia?.thumbnailPath);
+        const headerVideoUrl = toWorkoutMediaUrl(definition?.video_path || fallbackMedia?.videoPath);
+        const currentSets = sets?.[exercise.id] || [];
+        if (currentSets.length === 0) return null;
 
         return (
-          <div key={exercise.id} className="rounded-xl border border-border-subtle bg-card p-4">
-            <div className="flex items-start justify-between gap-3 mb-3">
-              <div>
-                <h3 className="font-bold text-text-main">{definition?.name || 'Exercise'}</h3>
-                <p className="text-xs text-text-muted mt-1">{definition?.muscle_group || 'General'}</p>
-              </div>
-              <span className="text-xs font-semibold text-text-muted bg-surface px-2 py-1 rounded-md">
-                {completedSets.length} set{completedSets.length > 1 ? 's' : ''}
-              </span>
+          <div key={exercise.id} className="bg-card rounded-2xl p-4 shadow-sm border border-border-subtle">
+            <div className="flex items-start gap-3 mb-4">
+              <Link
+                to={`/workouts/exercises/${encodeURIComponent(exercise.exercise_id)}`}
+                className="flex items-center gap-3 min-w-0 rounded-lg -m-1 p-1"
+              >
+                {(headerThumbnailUrl || headerVideoUrl) ? (
+                  <div className="h-12 w-12 rounded-lg overflow-hidden bg-surface flex-shrink-0">
+                    {headerThumbnailUrl ? (
+                      <img
+                        src={headerThumbnailUrl}
+                        alt={definition?.name || 'Workout exercise'}
+                        className="h-full w-full object-cover"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <video
+                        src={headerVideoUrl}
+                        className="h-full w-full object-cover"
+                        muted
+                        playsInline
+                        preload="metadata"
+                      />
+                    )}
+                  </div>
+                ) : null}
+                <div className="min-w-0">
+                  <span className="font-bold text-lg text-brand truncate block hover:underline">
+                    {definition?.name || 'Exercise'}
+                  </span>
+                </div>
+              </Link>
+            </div>
+
+            <div className="mb-2 grid grid-cols-12 gap-2 items-center text-[11px] font-semibold uppercase tracking-wide text-text-muted">
+              <span className="col-span-2 text-center">Set</span>
+              <span className="col-span-10">Weight &amp; Reps</span>
             </div>
 
             <div className="space-y-2">
-              {completedSets.map((set) => (
-                <div key={set.id} className="grid grid-cols-3 gap-2 rounded-lg bg-surface p-3 text-sm">
-                  <span className="font-semibold text-text-muted">Set {set.set_number}</span>
-                  <span className="text-text-main font-medium">{set.weight ?? 0} kg</span>
-                  <span className="text-text-main font-medium text-right">{set.reps ?? 0} reps</span>
+              {currentSets.map((set) => (
+                <div key={set.id} className="grid grid-cols-12 gap-2 items-center rounded-lg bg-transparent px-2 py-2 text-sm">
+                  <span className="col-span-2 text-center text-text-muted font-bold">{set.set_number}</span>
+                  <span className="col-span-10 text-text-main font-medium">{set.weight ?? 0}kg x {set.reps ?? 0}</span>
                 </div>
               ))}
             </div>
@@ -247,8 +314,14 @@ const CompletedWorkoutView = ({
 
 const WorkoutSessionComponent = () => {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
   const workoutId: string | null = id === 'new' ? null : (id || null);
-  const [isEditingCompleted, setIsEditingCompleted] = useState(false);
+  const { push, pop } = useStackNavigation();
+  const [isEditingCompleted, setIsEditingCompleted] = useState(searchParams.get('edit') === '1');
+
+  useEffect(() => {
+    setIsEditingCompleted(searchParams.get('edit') === '1');
+  }, [searchParams]);
 
   // Destructuring everything from our custom hook
   const {
@@ -272,6 +345,7 @@ const WorkoutSessionComponent = () => {
     requestFinishWorkout,
     saveFinishedWorkout,
     copyWorkout,
+    deleteWorkout,
     handleToggleSet,
     restPreferences,
     setExerciseRestPreference,
@@ -285,13 +359,30 @@ const WorkoutSessionComponent = () => {
   const [isSavingFinish, setIsSavingFinish] = useState(false);
   const [showWorkoutActions, setShowWorkoutActions] = useState(false);
   const [isCopyingWorkout, setIsCopyingWorkout] = useState(false);
+  const [isDeletingWorkout, setIsDeletingWorkout] = useState(false);
   const [editingRestExerciseId, setEditingRestExerciseId] = useState<string | null>(null);
+  const [mediaFallbackByExerciseId, setMediaFallbackByExerciseId] = useState<Record<string, { videoPath?: string; thumbnailPath?: string }>>({});
 
   const previousSetsByExercise = useLiveQuery(async () => {
     if (!exercises?.length || !workout?.start_time) return {};
     const exerciseIds = Array.from(new Set(exercises.map((exercise) => exercise.exercise_id)));
     return getPreviousWorkoutSets(exerciseIds, workout.start_time);
   }, [exercises, workout?.start_time]);
+
+  const isFinished = Boolean(workout?.end_time);
+  const showCompletedReadonly = isFinished && !isEditingCompleted;
+  const canEditWorkout = !showCompletedReadonly;
+
+  const completedWorkoutOrdinal = useLiveQuery(async () => {
+    if (!showCompletedReadonly || !workout?.id) return null;
+
+    const finishedWorkouts = (await db.workouts.toArray())
+      .filter((item) => item.end_time)
+      .sort((a, b) => new Date(a.end_time as any).getTime() - new Date(b.end_time as any).getTime());
+
+    const index = finishedWorkouts.findIndex((item) => item.id === workout.id);
+    return index >= 0 ? index + 1 : null;
+  }, [showCompletedReadonly, workout?.id, workout?.end_time]);
 
   const restTimerOptions = useMemo(() => {
     const base = [0, 5, 10, 15];
@@ -320,6 +411,21 @@ const WorkoutSessionComponent = () => {
     const secs = safeSeconds % 60;
     if (mins <= 0) return `${secs}s`;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const toOrdinal = (value: number) => {
+    const mod100 = value % 100;
+    if (mod100 >= 11 && mod100 <= 13) return `${value}th`;
+    switch (value % 10) {
+      case 1:
+        return `${value}st`;
+      case 2:
+        return `${value}nd`;
+      case 3:
+        return `${value}rd`;
+      default:
+        return `${value}th`;
+    }
   };
 
   const formatPreviousSetValueByMetric = (
@@ -429,9 +535,90 @@ const WorkoutSessionComponent = () => {
     }
   };
 
-  const isFinished = Boolean(workout?.end_time);
-  const showCompletedReadonly = isFinished && !isEditingCompleted;
-  const canEditWorkout = !showCompletedReadonly;
+  const handleSaveAsRoutine = () => {
+    if (!workoutId) return;
+    if (!exercises?.length) {
+      alert('No exercises to save as routine.');
+      return;
+    }
+
+    setShowWorkoutActions(false);
+    push(`/workouts/routines/new?fromWorkoutId=${encodeURIComponent(workoutId)}`);
+  };
+
+  const handleDeleteWorkout = async () => {
+    setIsDeletingWorkout(true);
+    try {
+      await deleteWorkout();
+    } finally {
+      setIsDeletingWorkout(false);
+      setShowWorkoutActions(false);
+    }
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const resolveFallbackMedia = async () => {
+      const defs = Object.values(definitions || {});
+      if (!defs.length) {
+        setMediaFallbackByExerciseId({});
+        return;
+      }
+
+      try {
+        const response = await fetch(toWorkoutMediaUrl('workouts/media-map.json'), { cache: 'no-cache' });
+        if (!response.ok) return;
+
+        const mediaMap = (await response.json()) as WorkoutMediaMap;
+        const mediaEntries = mediaMap.media || [];
+
+        const bySourceId = new Map(mediaEntries.map((entry) => [entry.sourceId, entry]));
+        const byNormalizedName = mediaEntries.map((entry) => ({
+          entry,
+          normalizedName: mediaNameFromVideoPath(entry.videoPath)
+        }));
+
+        const next: Record<string, { videoPath?: string; thumbnailPath?: string }> = {};
+
+        for (const def of defs) {
+          if (def.video_path || def.thumbnail_path) continue;
+
+          let matched: WorkoutMediaEntry | undefined;
+          if (def.source_id) {
+            matched = bySourceId.get(def.source_id);
+          }
+
+          if (!matched) {
+            const normalizedExerciseName = normalizeName(def.name || '');
+            matched = byNormalizedName.find((item) =>
+              item.normalizedName === normalizedExerciseName ||
+              item.normalizedName.includes(normalizedExerciseName) ||
+              normalizedExerciseName.includes(item.normalizedName)
+            )?.entry;
+          }
+
+          if (matched) {
+            next[def.id] = {
+              videoPath: matched.videoPath,
+              thumbnailPath: matched.thumbnailPath || undefined,
+            };
+          }
+        }
+
+        if (!cancelled) {
+          setMediaFallbackByExerciseId(next);
+        }
+      } catch {
+        // no-op fallback
+      }
+    };
+
+    void resolveFallbackMedia();
+    return () => {
+      cancelled = true;
+    };
+  }, [definitions]);
 
   return (
     <div className="pb-32 pt-4 px-4 max-w-md mx-auto min-h-screen bg-background">
@@ -439,19 +626,27 @@ const WorkoutSessionComponent = () => {
       <header className="mb-6 sticky top-0 bg-background z-20 py-2 border-b border-border-subtle -mx-4 px-4">
         <div className="flex justify-between items-center mb-2">
           <div className="flex items-center gap-2 min-w-0">
-            {showFinishScreen && (
+            {(showFinishScreen || showCompletedReadonly) && (
               <button
-                onClick={() => transitionFinishScreen('backward', () => {
-                  setShowFinishScreen(false);
-                  if (isEditingCompleted) setIsEditingCompleted(false);
-                })}
+                onClick={() => {
+                  if (showFinishScreen) {
+                    transitionFinishScreen('backward', () => {
+                      setShowFinishScreen(false);
+                      if (isEditingCompleted) setIsEditingCompleted(false);
+                    });
+                    return;
+                  }
+                  pop('/workouts');
+                }}
                 className="h-9 w-9 rounded-lg border border-border-subtle bg-surface text-text-main flex items-center justify-center"
                 aria-label="Back"
               >
                 <ChevronDown size={18} className="rotate-90" />
               </button>
             )}
-            <h1 className="text-xl font-bold truncate">{showFinishScreen ? 'Finish Workout' : workout?.name || 'Workout'}</h1>
+            <h1 className="text-xl font-bold truncate">
+              {showFinishScreen ? 'Finish Workout' : showCompletedReadonly ? 'Workout Detail' : (workout?.name || 'Workout')}
+            </h1>
           </div>
           {showFinishScreen ? (
             <button
@@ -476,16 +671,33 @@ const WorkoutSessionComponent = () => {
                   <div className="absolute right-0 mt-2 w-44 rounded-xl border border-border-subtle bg-card shadow-lg z-30 overflow-hidden">
                     <button
                       onClick={handleEditWorkout}
-                      className="w-full px-3 py-2.5 text-left text-sm font-medium text-text-main hover:bg-surface"
+                      className="w-full px-3 py-2.5 text-left text-sm font-medium text-text-main hover:bg-surface inline-flex items-center gap-2"
                     >
+                      <Edit size={16} />
                       Edit Workout
                     </button>
                     <button
                       onClick={handleCopyWorkout}
                       disabled={isCopyingWorkout}
-                      className="w-full px-3 py-2.5 text-left text-sm font-medium text-text-main hover:bg-surface disabled:opacity-60"
+                      className="w-full px-3 py-2.5 text-left text-sm font-medium text-text-main hover:bg-surface inline-flex items-center gap-2"
                     >
+                      <Copy size={16} />
                       {isCopyingWorkout ? 'Copying...' : 'Copy Workout'}
+                    </button>
+                    <button
+                      onClick={handleSaveAsRoutine}
+                      className="w-full px-3 py-2.5 text-left text-sm font-medium text-text-main hover:bg-surface inline-flex items-center gap-2"
+                    >
+                      <Save size={16} />
+                      Save as Routine
+                    </button>
+                    <button
+                      onClick={handleDeleteWorkout}
+                      disabled={isDeletingWorkout}
+                      className="w-full px-3 py-2.5 text-left text-sm font-medium text-red-500 hover:bg-surface disabled:opacity-60 inline-flex items-center gap-2"
+                    >
+                      <Trash size={16} />
+                      {isDeletingWorkout ? 'Deleting...' : 'Delete Workout'}
                     </button>
                   </div>
                 )}
@@ -508,13 +720,7 @@ const WorkoutSessionComponent = () => {
           )}
         </div>
 
-        {showCompletedReadonly && workout?.end_time && (
-          <p className="text-xs text-text-muted mb-2">
-            Completed {new Date(workout.end_time).toLocaleString()}
-          </p>
-        )}
-
-        {!showFinishScreen && (
+        {!showFinishScreen && !showCompletedReadonly && (
           <div className="flex justify-between text-xs font-semibold text-text-muted uppercase">
             <StatItem label="Duration" value={elapsedTime} />
             <StatItem label="Volume" value={`${totalStats.volume} kg`} border />
@@ -584,19 +790,54 @@ const WorkoutSessionComponent = () => {
 
         </section>
       ) : showCompletedReadonly ? (
-        <CompletedWorkoutView
-          workout={workout}
-          elapsedTime={elapsedTime}
-          exercises={exercises}
-          definitions={definitions}
-          sets={sets}
-        />
+        <>
+          <section className="rounded-2xl border border-border-subtle bg-card p-4 space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h2 className="text-lg font-bold text-text-main truncate">{workout?.name || 'Workout'}</h2>
+                {completedWorkoutOrdinal ? (
+                  <p className="text-xs font-semibold text-text-muted mt-0.5">
+                    {toOrdinal(completedWorkoutOrdinal)} workout
+                  </p>
+                ) : null}
+                <p className="text-xs text-text-muted">
+                  {workout?.end_time ? new Date(workout.end_time).toLocaleString() : ''}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="rounded-lg border border-border-subtle bg-surface px-2 py-2">
+                <p className="text-[11px] font-semibold uppercase text-text-muted">Time</p>
+                <p className="text-sm font-bold text-text-main">{elapsedTime}</p>
+              </div>
+              <div className="rounded-lg border border-border-subtle bg-surface px-2 py-2">
+                <p className="text-[11px] font-semibold uppercase text-text-muted">Volume</p>
+                <p className="text-sm font-bold text-text-main">{totalStats.volume} kg</p>
+              </div>
+              <div className="rounded-lg border border-border-subtle bg-surface px-2 py-2">
+                <p className="text-[11px] font-semibold uppercase text-text-muted">Sets</p>
+                <p className="text-sm font-bold text-text-main">{totalStats.sets}</p>
+              </div>
+            </div>
+          </section>
+
+          <CompletedWorkoutView
+            workout={workout}
+            elapsedTime={elapsedTime}
+            exercises={exercises}
+            definitions={definitions}
+            sets={sets}
+            mediaFallbackByExerciseId={mediaFallbackByExerciseId}
+          />
+        </>
       ) : (
         <>
           {/* Exercise List */}
           <div className="space-y-6">
             {exercises?.map((exercise, exerciseIndex) => {
               const def = definitions?.[exercise.exercise_id];
+              const fallbackMedia = mediaFallbackByExerciseId[exercise.exercise_id];
               const currentSets = sets?.[exercise.id] || [];
               const previousSets = previousSetsByExercise?.[exercise.exercise_id]?.sets || [];
               const metricColumns = getMetricColumns(def?.metric_type);
@@ -606,12 +847,32 @@ const WorkoutSessionComponent = () => {
               const isFirstExercise = exerciseIndex === 0;
               const isLastExercise = exerciseIndex === (exercises.length - 1);
               const isDurationOnlyMetric = metricColumns.first.field === 'duration_seconds' && metricColumns.second.field === null;
+              const thumbnailUrl = toWorkoutMediaUrl(def?.thumbnail_path || fallbackMedia?.thumbnailPath);
 
               return (
                 <div key={exercise.id} className="bg-card rounded-2xl p-4 shadow-sm border border-border-subtle">
                   <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <h3 className="font-bold text-lg text-brand-dark">{def?.name}</h3>
+                    <div className="min-w-0">
+                      <Link
+                        to={`/workouts/exercises/${encodeURIComponent(exercise.exercise_id)}`}
+                        className="flex items-center gap-3 min-w-0 rounded-lg -m-1 p-1"
+                      >
+                        {thumbnailUrl ? (
+                          <div className="h-12 w-12 rounded-lg overflow-hidden bg-surface flex-shrink-0">
+                            <img
+                              src={thumbnailUrl}
+                              alt={def?.name || 'Workout exercise'}
+                              className="h-full w-full object-cover"
+                              loading="lazy"
+                            />
+                          </div>
+                        ) : null}
+                        <div className="min-w-0">
+                          <span className="font-bold text-lg text-brand truncate block hover:underline">
+                            {def?.name || 'Exercise'}
+                          </span>
+                        </div>
+                      </Link>
                       <div className="mt-2 text-[11px] font-semibold uppercase tracking-wide text-text-muted">
                         {isEditingRestTimer ? (
                           <div className="inline-flex items-center gap-1.5 rounded-full border border-brand/20 bg-brand/10 px-2.5 py-1 text-[11px] font-semibold tracking-wide text-brand">

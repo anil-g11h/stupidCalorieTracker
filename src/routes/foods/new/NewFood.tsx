@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { useNavigate, Link } from 'react-router-dom'; // Assuming React Router
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom'; // Assuming React Router
 import { db } from '../../../lib/db';
 import { ESSENTIAL_AMINO_ACIDS } from '../../../lib/constants';
 import { generateId } from '../../../lib';
@@ -181,10 +181,82 @@ const normalizeTagArray = (value: unknown): string[] => {
 const filterAllowedTags = (values: string[], allowedSet: Set<string>) =>
   values.filter((value) => allowedSet.has(value));
 
+const SERVING_UNIT_OPTIONS = [
+  { value: 'g', label: 'Grams (g)', copyLabel: 'gram' },
+  { value: 'ml', label: 'Milliliters (ml)', copyLabel: 'ml' },
+  { value: 'oz', label: 'Ounces (oz)', copyLabel: 'oz' },
+  { value: 'serving', label: 'Serving', copyLabel: 'serving' }
+] as const;
+
+const normalizeServingUnit = (rawUnit?: string) => {
+  const unit = (rawUnit || '').trim().toLowerCase();
+  if (!unit) return 'g';
+
+  if (unit === 'g' || unit === 'gram' || unit === 'grams' || unit === 'gm') return 'g';
+  if (unit === 'ml' || unit === 'milliliter' || unit === 'milliliters') return 'ml';
+  if (unit === 'oz' || unit === 'ounce' || unit === 'ounces') return 'oz';
+  if (unit === 'serving' || unit === 'servings' || unit === 'piece' || unit === 'pieces' || unit === 'pc') {
+    return 'serving';
+  }
+
+  return 'g';
+};
+
+const UNIT_CONVERSION_FALLBACK_PREFIX = 'Unit conversion fallback ingredients:';
+
+const parseUnitFallbackIngredients = (notes: string): string[] => {
+  if (!notes) return [];
+  const line = notes
+    .split('\n')
+    .map((item) => item.trim())
+    .find((item) => item.startsWith(UNIT_CONVERSION_FALLBACK_PREFIX));
+
+  if (!line) return [];
+  const raw = line.replace(UNIT_CONVERSION_FALLBACK_PREFIX, '').trim();
+  if (!raw) return [];
+
+  return raw
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+};
+
+function formatIngredientQuantity(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return '0';
+  if (value >= 10) return String(Math.round(value * 10) / 10);
+  return String(Math.round(value * 100) / 100);
+}
+
+function formatRecipeIngredientAmount(quantity: number, servingSize: number, servingUnit: string): string {
+  const safeQuantity = formatIngredientQuantity(quantity);
+  if (servingSize === 1) {
+    return `${safeQuantity} ${servingUnit}`;
+  }
+
+  return `${safeQuantity} × ${formatIngredientQuantity(servingSize)} ${servingUnit}`;
+}
+
+function formatRecipeServing(servingSize: number, servingUnit: string): string {
+  if (servingSize === 1) return `1 ${servingUnit}`;
+  return `${formatIngredientQuantity(servingSize)} ${servingUnit}`;
+}
+
+function normalizeRecipeIngredientUnit(rawUnit?: string): string {
+  const unit = String(rawUnit || '').trim().toLowerCase();
+  if (!unit) return 'serving';
+
+  if (['piece', 'pieces', 'pc', 'count', 'unit', 'units', 'item', 'items', 'large', 'medium', 'small'].includes(unit)) {
+    return 'serving';
+  }
+
+  return unit;
+}
+
 
 const CreateFood: React.FC = () => {
+  const { id: editFoodId } = useParams<{ id?: string }>();
+  const isEditMode = Boolean(editFoodId);
   const navigate = useNavigate();
-
   const {pop} = useStackNavigation();
   // --- State ---
   const [name, setName] = useState('');
@@ -201,9 +273,151 @@ const CreateFood: React.FC = () => {
   const [aiNotes, setAiNotes] = useState('');
   const [aiInput, setAiInput] = useState('');
   const [showAiPasteInput, setShowAiPasteInput] = useState(false);
+  const [isRecipeFood, setIsRecipeFood] = useState(false);
+  const [recipeIngredients, setRecipeIngredients] = useState<Array<{
+    id: string;
+    childFoodId: string;
+    name: string;
+    quantity: number;
+    servingSize: number;
+    servingUnit: string;
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+  }>>([]);
+  const [unitFallbackIngredients, setUnitFallbackIngredients] = useState<string[]>([]);
+  const [prepMultiplier, setPrepMultiplier] = useState<number>(1);
+  const [isSavingIngredients, setIsSavingIngredients] = useState(false);
 
 
   const [isFetching, setIsFetching] = useState(false);
+  const hydratedFoodIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!editFoodId) return;
+    if (hydratedFoodIdRef.current === editFoodId) return;
+
+    let cancelled = false;
+
+    const loadFoodForEdit = async () => {
+      try {
+        const existingFood = await db.foods.get(editFoodId);
+        if (!existingFood) {
+          alert('Food not found');
+          navigate('/foods');
+          return;
+        }
+
+        if (cancelled) return;
+
+        setName(existingFood.name || '');
+        setBrand(existingFood.brand || '');
+        setServingSize(existingFood.serving_size ?? 100);
+        setServingUnit(normalizeServingUnit(existingFood.serving_unit));
+        setProtein(existingFood.protein || 0);
+        setCarbs(existingFood.carbs || 0);
+        setFat(existingFood.fat || 0);
+        setMicros(existingFood.micros || {});
+        setDietTags(existingFood.diet_tags || []);
+        setAllergenTags(existingFood.allergen_tags || []);
+        setAiNotes(existingFood.ai_notes || '');
+        setUnitFallbackIngredients(parseUnitFallbackIngredients(existingFood.ai_notes || ''));
+        setIsRecipeFood(Boolean(existingFood.is_recipe));
+
+        if (existingFood.is_recipe && editFoodId) {
+          const ingredientRows = await db.food_ingredients.where('parent_food_id').equals(editFoodId).toArray();
+          if (ingredientRows.length > 0) {
+            const ingredientFoodIds = [...new Set(ingredientRows.map((row) => row.child_food_id))];
+            const ingredientFoods = ingredientFoodIds.length > 0
+              ? await db.foods.where('id').anyOf(ingredientFoodIds).toArray()
+              : [];
+            const ingredientFoodById = ingredientFoods.reduce<Record<string, (typeof ingredientFoods)[number]>>((acc, food) => {
+              acc[food.id] = food;
+              return acc;
+            }, {});
+
+            setRecipeIngredients(
+              ingredientRows
+                .map((row) => {
+                  const ingredientFood = ingredientFoodById[row.child_food_id];
+
+                  return {
+                    id: row.id,
+                    childFoodId: row.child_food_id,
+                    name: ingredientFood?.name || 'Unknown Ingredient',
+                    quantity: Number(row.quantity) || 0,
+                    servingSize: Number(ingredientFood?.serving_size) || 1,
+                    servingUnit: normalizeRecipeIngredientUnit(ingredientFood?.serving_unit),
+                    calories: Number(ingredientFood?.calories) || 0,
+                    protein: Number(ingredientFood?.protein) || 0,
+                    carbs: Number(ingredientFood?.carbs) || 0,
+                    fat: Number(ingredientFood?.fat) || 0
+                  };
+                })
+                .sort((a, b) => a.name.localeCompare(b.name))
+            );
+          } else {
+            setRecipeIngredients([]);
+          }
+        } else {
+          setRecipeIngredients([]);
+        }
+
+        setPrepMultiplier(1);
+
+        hydratedFoodIdRef.current = editFoodId;
+      } catch (error) {
+        console.error('Failed to load food for edit:', error);
+        alert('Failed to load food');
+        navigate('/foods');
+      }
+    };
+
+    loadFoodForEdit();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [editFoodId, navigate]);
+
+  const updateRecipeIngredientQuantity = (ingredientId: string, nextQuantity: number) => {
+    setRecipeIngredients((prev) => prev.map((ingredient) => (
+      ingredient.id === ingredientId
+        ? { ...ingredient, quantity: Math.max(0, Number.isFinite(nextQuantity) ? nextQuantity : 0) }
+        : ingredient
+    )));
+  };
+
+  const saveRecipeIngredients = async () => {
+    if (!isEditMode || !editFoodId || !isRecipeFood) return;
+
+    setIsSavingIngredients(true);
+    try {
+      await db.transaction('rw', db.food_ingredients, db.foods, async () => {
+        await Promise.all(
+          recipeIngredients.map((ingredient) =>
+            db.food_ingredients.update(ingredient.id, {
+              quantity: Math.max(0.01, ingredient.quantity),
+              synced: 0
+            })
+          )
+        );
+
+        await db.foods.update(editFoodId, {
+          updated_at: new Date(),
+          synced: 0
+        });
+      });
+
+      alert('Recipe ingredient quantities updated.');
+    } catch (error) {
+      console.error('Failed to update recipe ingredients:', error);
+      alert('Failed to update recipe ingredient quantities');
+    } finally {
+      setIsSavingIngredients(false);
+    }
+  };
 
   const fetchAiData = async () => {
     if (!name) return alert("Please enter a food name first");
@@ -283,7 +497,9 @@ const CreateFood: React.FC = () => {
 
   const copyAIPrompt = () => {
     const foodTarget = name || "[INSERT FOOD NAME]";
-    const prompt = `Act as a clinical nutrition database. Provide the full nutritional profile for "${foodTarget}" specifically for a serving size of ${servingSize}${servingUnit}.
+    const normalizedServingUnit = normalizeServingUnit(servingUnit);
+    const copyLabel = SERVING_UNIT_OPTIONS.find((option) => option.value === normalizedServingUnit)?.copyLabel || normalizedServingUnit;
+    const prompt = `Act as a clinical nutrition database. Provide the full nutritional profile for "${foodTarget}" specifically for a serving size of ${servingSize}${normalizedServingUnit}.
   Return data ONLY as raw JSON with keys: "protein", "fat", "carbs", "calories", "micros", "diet_tags", "allergen_tags", "ai_notes".
 
   EXACT_MICROS_KEYS:
@@ -306,7 +522,7 @@ const CreateFood: React.FC = () => {
   All numeric values must be numbers (no strings, no units, no markdown, no prose, no extra keys).`;
     
     navigator.clipboard.writeText(prompt);
-    alert(`Prompt for ${servingSize}${servingUnit} copied!`);
+    alert(`Prompt for ${servingSize} ${copyLabel} copied!`);
   };
 
   const handleAiPaste = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -369,36 +585,66 @@ const CreateFood: React.FC = () => {
 
     async function handleSubmit() {
     try {
-      await db.foods.add({
-        id: generateId(),
-        name,
-        brand: brand || undefined,
-        diet_tags: dietTags,
-        allergen_tags: allergenTags,
-        ai_notes: aiNotes || undefined,
-        calories,
-        protein,
-        carbs,
-        fat,
-        serving_size: servingSize,
-        serving_unit: servingUnit,
-        micros,
-        is_recipe: false,
-        created_at: new Date(),
-        updated_at: new Date(),
-        synced: 0
-      });
+      const now = new Date();
+
+      if (isEditMode && editFoodId) {
+        const existingFood = await db.foods.get(editFoodId);
+        if (!existingFood) {
+          alert('Food not found');
+          pop('/foods');
+          return;
+        }
+
+        await db.foods.update(editFoodId, {
+          name,
+          brand: brand || undefined,
+          diet_tags: dietTags,
+          allergen_tags: allergenTags,
+          ai_notes: aiNotes || undefined,
+          calories,
+          protein,
+          carbs,
+          fat,
+          serving_size: servingSize,
+          serving_unit: servingUnit,
+          micros,
+          is_recipe: existingFood.is_recipe,
+          updated_at: now,
+          synced: 0
+        });
+      } else {
+        await db.foods.add({
+          id: generateId(),
+          name,
+          brand: brand || undefined,
+          diet_tags: dietTags,
+          allergen_tags: allergenTags,
+          ai_notes: aiNotes || undefined,
+          calories,
+          protein,
+          carbs,
+          fat,
+          serving_size: servingSize,
+          serving_unit: servingUnit,
+          micros,
+          is_recipe: false,
+          created_at: now,
+          updated_at: now,
+          synced: 0
+        });
+      }
+
       pop('/foods');
     } catch (error) {
-      console.error('Failed to create food:', error);
-      alert('Failed to create food');
+      console.error('Failed to save food:', error);
+      alert('Failed to save food');
     }
   }
 
   return (
 <div className="container mx-auto p-4 max-w-lg bg-page">
       <header className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">New Food</h1>
+        <h1 className="text-2xl font-bold">{isEditMode ? 'Edit Food' : 'New Food'}</h1>
         <button 
           onClick={fetchAiData}
           disabled={isFetching || !name}
@@ -468,16 +714,100 @@ const CreateFood: React.FC = () => {
             <label className="block text-[10px] font-bold text-text-muted uppercase mb-1 ml-1">Unit</label>
             <select 
               value={servingUnit}
-              onChange={(e) => setServingUnit(e.target.value)}
+              onChange={(e) => setServingUnit(normalizeServingUnit(e.target.value))}
               className="w-full p-2 border border-border-subtle rounded-lg bg-card font-medium text-text-main"
             >
-              <option value="g">Grams (g)</option>
-              <option value="ml">Milliliters (ml)</option>
-              <option value="oz">Ounces (oz)</option>
-              <option value="serving">Serving</option>
+              {SERVING_UNIT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
             </select>
           </div>
         </div>
+
+        {isEditMode && isRecipeFood && (
+          <div className="space-y-3 p-4 bg-surface rounded-xl border border-border-subtle">
+            <label className="block text-[10px] font-bold text-text-muted uppercase tracking-widest">Recipe Ingredients</label>
+            {unitFallbackIngredients.length > 0 && (
+              <div className="text-xs rounded-lg border border-macro-fat/30 bg-macro-fat/10 px-2.5 py-2 text-text-main">
+                ⚠ Unit conversion fallback used for: {unitFallbackIngredients.join(', ')}
+              </div>
+            )}
+            <div className="flex items-center justify-between gap-2">
+              <label className="text-[10px] font-bold text-text-muted uppercase tracking-widest">Prep Multiplier</label>
+              <input
+                type="number"
+                step="0.1"
+                min="0.1"
+                value={prepMultiplier}
+                onChange={(e) => setPrepMultiplier(Math.max(0.1, Number(e.target.value) || 1))}
+                className="w-24 p-1.5 text-sm border border-border-subtle rounded-lg text-right bg-card text-text-main"
+              />
+            </div>
+            {recipeIngredients.length === 0 ? (
+              <p className="text-xs text-text-muted">No linked ingredients found for this recipe.</p>
+            ) : (
+              <ul className="space-y-2">
+                {recipeIngredients.map((ingredient) => (
+                  <li key={ingredient.id} className="text-sm text-text-main rounded-lg border border-border-subtle p-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <Link
+                        to={`/foods/${ingredient.childFoodId}/edit`}
+                        className="truncate text-brand hover:underline"
+                      >
+                        {ingredient.name}
+                      </Link>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={ingredient.quantity}
+                          onChange={(e) => updateRecipeIngredientQuantity(ingredient.id, Number(e.target.value))}
+                          className="w-20 p-1 text-right text-xs border border-border-subtle rounded bg-card text-text-main"
+                        />
+                      </div>
+                    </div>
+                    <div className="mt-1 text-[10px] text-text-muted">
+                      Serving: {formatRecipeServing(ingredient.servingSize, ingredient.servingUnit)}
+                      {Math.abs(prepMultiplier - 1) > 0.001 && (
+                        <>
+                          {' • '}Prep total: {formatRecipeIngredientAmount(ingredient.quantity * prepMultiplier, ingredient.servingSize, ingredient.servingUnit)}
+                        </>
+                      )}
+                    </div>
+                    <details className="mt-1">
+                      <summary className="cursor-pointer text-[10px] font-bold text-brand">View nutrition</summary>
+                      <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-1 text-[10px] text-text-muted">
+                        <span>Base kcal: {formatIngredientQuantity(ingredient.calories * ingredient.quantity)}</span>
+                        <span>Base protein: {formatIngredientQuantity(ingredient.protein * ingredient.quantity)} g</span>
+                        <span>Base carbs: {formatIngredientQuantity(ingredient.carbs * ingredient.quantity)} g</span>
+                        <span>Base fat: {formatIngredientQuantity(ingredient.fat * ingredient.quantity)} g</span>
+                        {Math.abs(prepMultiplier - 1) > 0.001 && (
+                          <>
+                            <span>Prep kcal: {formatIngredientQuantity(ingredient.calories * ingredient.quantity * prepMultiplier)}</span>
+                            <span>Prep protein: {formatIngredientQuantity(ingredient.protein * ingredient.quantity * prepMultiplier)} g</span>
+                            <span>Prep carbs: {formatIngredientQuantity(ingredient.carbs * ingredient.quantity * prepMultiplier)} g</span>
+                            <span>Prep fat: {formatIngredientQuantity(ingredient.fat * ingredient.quantity * prepMultiplier)} g</span>
+                          </>
+                        )}
+                      </div>
+                    </details>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {recipeIngredients.length > 0 && (
+              <button
+                type="button"
+                onClick={saveRecipeIngredients}
+                disabled={isSavingIngredients}
+                className="w-full py-2 rounded-lg bg-brand text-brand-fg text-sm font-bold disabled:opacity-60"
+              >
+                {isSavingIngredients ? 'Saving…' : 'Save Ingredient Quantities'}
+              </button>
+            )}
+          </div>
+        )}
 
         <div className="space-y-3 p-4 bg-surface rounded-xl border border-border-subtle">
           <label className="block text-[10px] font-bold text-text-muted uppercase tracking-widest">Food Dietary Tags</label>
@@ -625,7 +955,7 @@ const CreateFood: React.FC = () => {
             onClick={handleSubmit}
             className="flex-[2] py-4 bg-brand text-brand-fg rounded-xl font-black text-lg shadow-lg hover:opacity-90 active:scale-[0.98] transition-all"
           >
-            Save Food
+            {isEditMode ? 'Update Food' : 'Save Food'}
           </button>
         </div>
       </form>

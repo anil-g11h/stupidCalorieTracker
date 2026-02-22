@@ -167,9 +167,12 @@ create policy "Allow users to manage own activity logs" on public.activity_logs 
 create table if not exists public.workout_exercises_def ( -- Renamed to better clarify. This is the exercise library
   id uuid default gen_random_uuid() primary key,
   user_id uuid references auth.users(id), -- Null means global/public exercise
+  source_id text,
   name text not null,
   muscle_group text, -- 'Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Core', 'Cardio', 'Other'
   equipment text, -- 'Barbell', 'Dumbbell', 'Machine', 'Bodyweight', 'Cable', 'Other'
+  video_path text,
+  thumbnail_path text,
   primary_metric text default 'reps_weight', -- 'reps_weight', 'time_weight', 'time_distance', 'time'
   secondary_muscle_groups text[] default '{}',
   metric_type text default 'weight_reps',

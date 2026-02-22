@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
@@ -10,11 +10,43 @@ import {
 } from '@phosphor-icons/react';
 import { db, type WorkoutExerciseDef } from '../../../lib/db';
 import { generateId } from '../../../lib';
-import { METRIC_TYPES } from '../../../lib/workouts';
 import { useStackNavigation } from '../../../lib/useStackNavigation';
 
 const MUSCLE_GROUPS = ['Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Core', 'Cardio', 'Other'];
 const EQUIPMENT_TYPES = ['Barbell', 'Dumbbell', 'Machine', 'Cable', 'Bodyweight', 'Kettlebell', 'Band', 'None'];
+
+type WorkoutMediaEntry = {
+    sourceId: string;
+    videoPath: string;
+    thumbnailPath: string | null;
+};
+
+type WorkoutMediaMap = {
+    media?: WorkoutMediaEntry[];
+};
+
+const toWorkoutMediaUrl = (path?: string | null) => {
+    if (!path) return '';
+    const base = import.meta.env.BASE_URL || '/';
+    const normalizedBase = base.endsWith('/') ? base : `${base}/`;
+    return `${normalizedBase}${path.replace(/^\/+/, '')}`;
+};
+
+const normalizeName = (value: string) =>
+    value
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+const mediaNameFromVideoPath = (videoPath: string) => {
+    const file = videoPath.split('/').pop() || videoPath;
+    const noExt = file.replace(/\.mp4$/i, '');
+    const noPrefix = noExt.replace(/^\d+-/, '');
+    const noSuffix = noPrefix.replace(/-(chest|back|thighs|shoulders|shoulder|upper-arms|lower-arms|waist|hips|calves|plyometrics)$/i, '');
+    const noGender = noSuffix.replace(/-(female|male)$/i, '');
+    return normalizeName(noGender.replace(/-/g, ' '));
+};
 
 export default function ExerciseSelector() {
     const [searchParams] = useSearchParams();
@@ -36,15 +68,14 @@ export default function ExerciseSelector() {
     
     // --- UI State ---
     const [searchTerm, setSearchTerm] = useState('');
+    const [selectedMuscleGroup, setSelectedMuscleGroup] = useState('All');
+    const [selectedEquipment, setSelectedEquipment] = useState('All');
     const [selected, setSelected] = useState<Record<string, boolean>>({});
+    const [mediaFallbackByExerciseId, setMediaFallbackByExerciseId] = useState<Record<string, { videoPath?: string; thumbnailPath?: string }>>({});
 
     // --- Data Fetching ---
     const allExercises = useLiveQuery(async () => {
         const data = await db.workout_exercises_def.toArray();
-        // if (data.length === 0 && !searchTerm) {
-        //   await seedDefaults();
-        //   return [];
-        // }
         return data;
     }, []);
 
@@ -54,12 +85,85 @@ export default function ExerciseSelector() {
 
         const lower = searchTerm.toLowerCase();
         return allExercises
-            .filter(e =>
-                e.name.toLowerCase().includes(lower) ||
-                (e.muscle_group && e.muscle_group.toLowerCase().includes(lower))
-            )
+            .filter((exercise) => {
+                const matchesSearch =
+                    exercise.name.toLowerCase().includes(lower) ||
+                    (exercise.muscle_group && exercise.muscle_group.toLowerCase().includes(lower));
+
+                const matchesMuscleGroup =
+                    selectedMuscleGroup === 'All' ||
+                    exercise.muscle_group === selectedMuscleGroup;
+
+                const matchesEquipment =
+                    selectedEquipment === 'All' ||
+                    exercise.equipment === selectedEquipment;
+
+                return matchesSearch && matchesMuscleGroup && matchesEquipment;
+            })
             .sort((a, b) => a.name.localeCompare(b.name));
-    }, [allExercises, searchTerm]);
+    }, [allExercises, searchTerm, selectedMuscleGroup, selectedEquipment]);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        const resolveFallbackMedia = async () => {
+            if (!allExercises?.length) {
+                setMediaFallbackByExerciseId({});
+                return;
+            }
+
+            try {
+                const response = await fetch(toWorkoutMediaUrl('workouts/media-map.json'), { cache: 'no-cache' });
+                if (!response.ok) return;
+                const mediaMap = (await response.json()) as WorkoutMediaMap;
+                const mediaEntries = mediaMap.media || [];
+
+                const bySourceId = new Map(mediaEntries.map((entry) => [entry.sourceId, entry]));
+                const byNormalizedName = mediaEntries.map((entry) => ({
+                    entry,
+                    normalizedName: mediaNameFromVideoPath(entry.videoPath)
+                }));
+
+                const next: Record<string, { videoPath?: string; thumbnailPath?: string }> = {};
+
+                for (const exercise of allExercises) {
+                    if (exercise.video_path || exercise.thumbnail_path) continue;
+
+                    let matched: WorkoutMediaEntry | undefined;
+                    if (exercise.source_id) {
+                        matched = bySourceId.get(exercise.source_id);
+                    }
+
+                    if (!matched) {
+                        const normalizedExerciseName = normalizeName(exercise.name || '');
+                        matched = byNormalizedName.find((item) =>
+                            item.normalizedName === normalizedExerciseName ||
+                            item.normalizedName.includes(normalizedExerciseName) ||
+                            normalizedExerciseName.includes(item.normalizedName)
+                        )?.entry;
+                    }
+
+                    if (matched) {
+                        next[exercise.id] = {
+                            videoPath: matched.videoPath,
+                            thumbnailPath: matched.thumbnailPath || undefined
+                        };
+                    }
+                }
+
+                if (!cancelled) {
+                    setMediaFallbackByExerciseId(next);
+                }
+            } catch {
+                // no-op fallback
+            }
+        };
+
+        void resolveFallbackMedia();
+        return () => {
+            cancelled = true;
+        };
+    }, [allExercises]);
 
     // --- Handlers ---
     const toggleSelect = (id: string) => {
@@ -203,9 +307,46 @@ export default function ExerciseSelector() {
                 />
             </div>
 
+            {/* Filters */}
+            <div className="grid grid-cols-2 gap-3 mb-6">
+                <div>
+                    <label className="block text-xs font-bold text-text-muted uppercase mb-1 ml-1">Muscle Group</label>
+                    <select
+                        value={selectedMuscleGroup}
+                        onChange={(e) => setSelectedMuscleGroup(e.target.value)}
+                        className="w-full p-3 bg-card border border-border-subtle rounded-xl text-text-main focus:ring-2 focus:ring-brand outline-none appearance-none cursor-pointer"
+                    >
+                        <option value="All">All</option>
+                        {MUSCLE_GROUPS.map((group) => (
+                            <option key={group} value={group}>{group}</option>
+                        ))}
+                    </select>
+                </div>
+
+                <div>
+                    <label className="block text-xs font-bold text-text-muted uppercase mb-1 ml-1">Equipment</label>
+                    <select
+                        value={selectedEquipment}
+                        onChange={(e) => setSelectedEquipment(e.target.value)}
+                        className="w-full p-3 bg-card border border-border-subtle rounded-xl text-text-main focus:ring-2 focus:ring-brand outline-none appearance-none cursor-pointer"
+                    >
+                        <option value="All">All</option>
+                        {EQUIPMENT_TYPES.map((equipment) => (
+                            <option key={equipment} value={equipment}>{equipment}</option>
+                        ))}
+                    </select>
+                </div>
+            </div>
+
             {/* Exercise List */}
             <div className="space-y-3">
                 {filteredExercises.map((exercise) => (
+                    (() => {
+                        const fallbackMedia = mediaFallbackByExerciseId[exercise.id];
+                        const thumbnailPath = exercise.thumbnail_path || fallbackMedia?.thumbnailPath;
+                        const videoPath = exercise.video_path || fallbackMedia?.videoPath;
+
+                        return (
                     <div
                         key={exercise.id}
                         onClick={() => toggleSelect(exercise.id)}
@@ -214,20 +355,47 @@ export default function ExerciseSelector() {
                             : 'border-transparent'
                             }`}
                     >
-                        <div>
+                        <div className="flex items-center gap-3 min-w-0">
+                            {(thumbnailPath || videoPath) ? (
+                                <div className="h-14 w-14 rounded-lg overflow-hidden border border-border-subtle bg-surface shrink-0">
+                                    {thumbnailPath ? (
+                                        <img
+                                            src={toWorkoutMediaUrl(thumbnailPath)}
+                                            alt={exercise.name}
+                                            className="h-full w-full object-cover"
+                                            loading="lazy"
+                                        />
+                                    ) : videoPath ? (
+                                        <video
+                                            src={toWorkoutMediaUrl(videoPath)}
+                                            className="h-full w-full object-cover"
+                                            muted
+                                            playsInline
+                                            preload="metadata"
+                                        />
+                                    ) : null}
+                                </div>
+                            ) : null}
+                            <div className="min-w-0">
                             <div className="font-bold text-lg text-text-main">{exercise.name}</div>
                             <div className="text-xs text-text-muted mt-1 uppercase tracking-wider font-semibold">
                                 {exercise.muscle_group} • {exercise.equipment}
                             </div>
+                                {videoPath ? (
+                                    <div className="text-[10px] font-semibold text-brand mt-1 uppercase tracking-wide">Video available</div>
+                                ) : null}
+                            </div>
                         </div>
                         {/* Checkbox icon removed */}
                     </div>
+                        );
+                    })()
                 ))}
 
                 {filteredExercises.length === 0 && (
                     <div className="text-center py-12 text-text-muted">
                         <p>No exercises found.</p>
-                        <p className="text-xs">Try searching for something else or create one.</p>
+                        <p className="text-xs">Try adjusting search/filters or create one.</p>
                     </div>
                 )}
             </div>

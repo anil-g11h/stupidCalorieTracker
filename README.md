@@ -43,6 +43,7 @@ Configure the environment variables to connect your app to Supabase.
     ```env
     VITE_SUPABASE_URL=your_supabase_project_url
     VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+    VITE_SPOONACULAR_API_KEY=your_spoonacular_api_key
     ```
     You can find Supabase values in your Supabase project settings under **API**.
 
@@ -59,6 +60,15 @@ Configure the environment variables to connect your app to Supabase.
 
 Do not expose Gemini keys in `VITE_*` variables for static hosting.
 
+### 4. Spoonacular (Recipe Nutrition + Meal Suggestions)
+
+This app now includes Spoonacular-powered helpers in **Create Recipe**:
+
+- Search and import recipe nutrition as loggable recipe foods
+- Generate basic daily meal-plan suggestions (with optional `diet` filter)
+
+Set `VITE_SPOONACULAR_API_KEY` in `.env` to enable these features.
+
 ## Running the App
 
 Start the development server:
@@ -69,13 +79,15 @@ npm run dev
 
 Open your browser and navigate to `http://localhost:5173` (or the port shown in your terminal).
 
-## Seed Common Exercises
+## Database Migrations
 
-To populate the global exercise library with common exercises, open Supabase SQL Editor and run:
+Database changes are migration-first. Instead of applying large SQL files manually, add a new file in `supabase/migrations` for each schema/data evolution and run it in order.
 
-- `supabase/seed_workout_exercises.sql`
+- Migration files are timestamp-prefixed (for example, `20260221_add_workout_routines.sql`).
+- Existing seed scripts have been removed from the repository.
+- Use idempotent SQL where possible (`if exists`, `if not exists`, guarded updates).
 
-The script is idempotent and only inserts missing names where `user_id is null`.
+See `supabase/MIGRATIONS.md` for the full migration authoring guide and checklist.
 
 ## Offline Features
 
