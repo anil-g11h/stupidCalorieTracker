@@ -463,19 +463,25 @@ export class SyncManager {
         };
 
         const executeUpdate = async () => {
-            let { error } = await supabase.from(supabaseTable).update(payload).eq('id', payload.id);
+            let { error } = await supabase
+                .from(supabaseTable)
+                .upsert(payload, { onConflict: 'id' });
 
             if (error && shouldRetryWithoutUserId(error)) {
-                console.warn(`[SyncManager] Retrying ${supabaseTable} update without user_id due to schema mismatch`);
+                console.warn(`[SyncManager] Retrying ${supabaseTable} upsert(update) without user_id due to schema mismatch`);
                 delete payload.user_id;
-                ({ error } = await supabase.from(supabaseTable).update(payload).eq('id', payload.id));
+                ({ error } = await supabase
+                    .from(supabaseTable)
+                    .upsert(payload, { onConflict: 'id' }));
             }
 
             let missingColumn = this.getMissingColumnFromError(error);
             while (error && missingColumn && Object.prototype.hasOwnProperty.call(payload, missingColumn)) {
-                console.warn(`[SyncManager] Retrying ${supabaseTable} update without missing column ${missingColumn}`);
+                console.warn(`[SyncManager] Retrying ${supabaseTable} upsert(update) without missing column ${missingColumn}`);
                 delete payload[missingColumn];
-                ({ error } = await supabase.from(supabaseTable).update(payload).eq('id', payload.id));
+                ({ error } = await supabase
+                    .from(supabaseTable)
+                    .upsert(payload, { onConflict: 'id' }));
                 missingColumn = this.getMissingColumnFromError(error);
             }
 
