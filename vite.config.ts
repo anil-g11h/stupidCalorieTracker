@@ -5,8 +5,8 @@ import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import path from 'path';
 
-export default defineConfig({
-   base: '/StupidCaloriesTracker/',
+export default defineConfig(({ command }) => ({
+    base: command === 'serve' ? '/' : '/StupidCaloriesTracker/',
     publicDir: 'static',
     resolve: {
         alias: {
@@ -30,7 +30,7 @@ export default defineConfig({
                 theme_color: '#ffffff',
                 background_color: '#ffffff',
                 display: 'standalone',
-                start_url: '/StupidCaloriesTracker/',
+                start_url: '.',
                 icons: [
                     {
                         src: 'pwa-192x192.png',
@@ -55,4 +55,4 @@ export default defineConfig({
     server: {
         host: '0.0.0.0' // This line is required to open the app on your phone
     }
-});
+}));
