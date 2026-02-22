@@ -23,6 +23,13 @@ Clone the repository and install the necessary packages using npm:
 npm install
 ```
 
+### 1.1 Install Database Tooling
+
+For DB operations in this repo:
+
+- Install Supabase CLI (required for `db:migrate:*` commands).
+- Install PostgreSQL client tools (`pg_dump`, `pg_restore`, `psql`) for backup/restore scripts.
+
 ### 2. Supabase Setup
 
 This project uses Supabase as a backend. You need to set up a Supabase project and apply the database schema.
@@ -93,11 +100,81 @@ Open your browser and navigate to `http://localhost:5173` (or the port shown in 
 
 Database changes are migration-first. Instead of applying large SQL files manually, add a new file in `supabase/migrations` for each schema/data evolution and run it in order.
 
+Database assets are organized as:
+
+- `supabase/schema.sql` → baseline schema snapshot (fresh-project bootstrap)
+- `supabase/migrations/` → ordered migration history (source of truth for deploys)
+- `supabase/seeds/workouts/` → generated workout exercise seed SQL
+- `scripts/db/` → DB utility scripts (seed generator + backup/restore)
+
 - Migration files are timestamp-prefixed (for example, `20260221_add_workout_routines.sql`).
 - Workout exercise seed SQL is generated from media assets via `npm run seed:workouts:sql`.
 - Use idempotent SQL where possible (`if exists`, `if not exists`, guarded updates).
 
-See `supabase/MIGRATIONS.md` for the full migration authoring guide and checklist.
+### Migration CLI (Supabase)
+
+This repo uses Supabase CLI to apply schema/data migrations.
+
+Then run:
+
+```bash
+# Create migration template
+npm run db:migrate:create -- add_user_preferences
+
+# See applied/pending migrations
+npm run db:migrate:status
+
+# Upgrade to latest
+npm run db:migrate:up
+```
+
+`db:migrate:status` and `db:migrate:up` auto-link using `SUPABASE_PROJECT_REF` (from environment or `.env`) when available.
+
+Supabase tracks migration history in `supabase_migrations.schema_migrations`.
+For rollback in production, create and apply a new forward-fix migration that reverts the bad change.
+
+### Deploy integration
+
+`npm run deploy` now attempts to run migrations automatically before build/publish:
+
+```bash
+# Runs `supabase db push` when Supabase CLI is installed
+npm run deploy
+
+# Skip migration step explicitly
+npm run deploy -- --skip-migrations
+
+# Create DB backup snapshot before applying migrations
+npm run deploy -- --backup-before-migrate --backup-label=release_candidate
+
+# Strict mode (recommended for CI/prod): fail if migrations cannot run
+npm run deploy:strict
+```
+
+If Supabase CLI is missing (or migration fails), deploy continues and prints a warning unless strict mode is enabled.
+Use strict mode (`--require-migrations` / `npm run deploy:strict`) to fail fast instead.
+
+## Database Backup & Restore
+
+For risky deployments, create a snapshot before migration:
+
+```bash
+# Uses SUPABASE_DB_URL (or DATABASE_URL) env var
+npm run db:backup
+
+# Optional label for easier identification
+npm run db:backup -- --label=before_big_schema_change
+```
+
+Restore from a backup folder when needed:
+
+```bash
+npm run db:restore -- --from=backups/db/20260222T120000Z_before_big_schema_change --yes
+```
+
+Backup files are written under `backups/db/` and intentionally git-ignored.
+
+See `supabase/MIGRATIONS.md` for migration authoring guidance and `supabase/DB_STRUCTURE.md` for the DB folder layout and operational flow.
 
 ## Offline Features
 

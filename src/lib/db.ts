@@ -70,6 +70,7 @@ export interface Goal {
   water_target?: number; // ml
   weight_target?: number; // kg or lbs
   created_at?: Date;
+  updated_at?: Date;
   synced?: number;
 }
 
@@ -324,6 +325,7 @@ export class MyDatabase extends Dexie {
     // Hooks for sync
     const tablesToSync = [
         'profiles', 'foods', 'food_ingredients', 'logs', 'goals', 'metrics', 
+      'settings',
         'activities', 'activity_logs',
         'workout_exercises_def', 'workouts', 'workout_log_entries', 'workout_sets', 'workout_rest_preferences',
         'workout_routines', 'workout_routine_entries', 'workout_routine_sets'

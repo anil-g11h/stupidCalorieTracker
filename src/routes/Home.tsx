@@ -451,7 +451,8 @@ export default function Home() {
         water_target: existingTodayGoal?.water_target ?? data?.goal?.water_target,
         weight_target: Math.round(value * 10) / 10,
         synced: 0,
-        created_at: existingTodayGoal?.created_at ?? new Date()
+        created_at: existingTodayGoal?.created_at ?? new Date(),
+        updated_at: new Date()
       };
 
       await db.goals.put(nextGoal);

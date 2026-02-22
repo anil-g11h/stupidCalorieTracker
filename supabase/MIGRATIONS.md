@@ -2,6 +2,8 @@
 
 This project uses a **migration-first** SQL workflow.
 
+For folder layout and operational scripts, see `supabase/DB_STRUCTURE.md`.
+
 ## Goals
 
 - Keep schema changes small, reviewable, and reversible.
@@ -47,7 +49,7 @@ Write sections in this order:
 ## Data Seeding Policy
 
 - Workout exercise reference data is seeded from static assets using `npm run seed:workouts:sql`.
-- Generated output is written to `supabase/seed_workout_exercises_from_assets.sql`.
+- Generated output is written to `supabase/seeds/workouts/seed_workout_exercises.wipe.sql`.
 - If additional reference data is required in production, model it as a migration-safe, idempotent **reference-data migration** with explicit keys and `on conflict` handling.
 - If data is only for local/dev experiments, keep it outside versioned migrations.
 
@@ -69,6 +71,47 @@ Write sections in this order:
 - Policies are dropped/recreated safely.
 - Manual validation queries are included.
 - README/docs updated when behavior changes.
+
+## CLI Workflow
+
+Use Supabase CLI from repo root:
+
+```bash
+# Create migration
+npm run db:migrate:create -- add_profile_locale
+
+# Review migration status
+npm run db:migrate:status
+
+# Apply pending migrations
+npm run db:migrate:up
+```
+
+`db:migrate:status` and `db:migrate:up` auto-link using `SUPABASE_PROJECT_REF` (from environment or `.env`) when available.
+
+Supabase records migration history in `supabase_migrations.schema_migrations`.
+
+## Rollback Strategy
+
+Production rollback uses a **forward-fix migration**:
+
+- Do not edit already-applied migration files.
+- Create a new migration that reverses the bad change.
+- Apply it with `npm run db:migrate:up`.
+
+For risky releases, take a DB snapshot immediately before deploying:
+
+```bash
+npm run db:backup -- --label=pre_release
+```
+
+If deployment goes wrong, restore from snapshot using:
+
+```bash
+npm run db:restore -- --from=backups/db/<timestamp>_pre_release --yes
+```
+
+This gives fast recovery while keeping the migration model strictly forward-only.
 
 ## Suggested Future Layout
 

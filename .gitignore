@@ -38,6 +38,9 @@ coverage/
 supabase/.temp/
 supabase/migrations/*.tmp
 
+# Database backups (local snapshots)
+backups/
+
 # Ignore local test outputs
 temp_page.svelte
 

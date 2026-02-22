@@ -70,6 +70,11 @@ export const DurationScrollerInput = ({
     setDraftSeconds((nextHours * 3600) + (nextMinutes * 60) + nextSeconds);
   };
 
+  const commitAndClose = () => {
+    onChange(draftSeconds);
+    setIsOpen(false);
+  };
+
   const displayDuration = () => {
     const h = Math.floor(safeSeconds / 3600);
     const m = Math.floor((safeSeconds % 3600) / 60);
@@ -92,7 +97,7 @@ export const DurationScrollerInput = ({
       {isOpen && (
         <div
           className="fixed inset-0 z-50 bg-black/30 flex items-end justify-center"
-          onClick={() => setIsOpen(false)}
+          onClick={commitAndClose}
         >
           <div
             className="w-full max-w-md rounded-t-2xl border border-border-subtle bg-card p-4"
@@ -102,7 +107,7 @@ export const DurationScrollerInput = ({
               <h3 className="text-sm font-bold text-text-main uppercase tracking-wide">Set Time</h3>
               <button
                 type="button"
-                onClick={() => setIsOpen(false)}
+                onClick={commitAndClose}
                 className="text-xs font-semibold text-text-muted"
               >
                 Close
@@ -144,10 +149,7 @@ export const DurationScrollerInput = ({
 
             <button
               type="button"
-              onClick={() => {
-                onChange(draftSeconds);
-                setIsOpen(false);
-              }}
+              onClick={commitAndClose}
               className="mt-4 w-full rounded-xl bg-brand text-white py-3 text-sm font-bold"
             >
               Apply

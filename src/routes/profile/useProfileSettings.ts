@@ -471,7 +471,8 @@ export function useProfileSettings() {
         water_target: existingTodayGoal?.water_target,
         weight_target: existingTodayGoal?.weight_target,
         synced: 0,
-        created_at: existingTodayGoal?.created_at ?? new Date()
+        created_at: existingTodayGoal?.created_at ?? new Date(),
+        updated_at: new Date()
       };
 
       await db.goals.put(upsertGoal);

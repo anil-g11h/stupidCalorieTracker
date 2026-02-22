@@ -8,7 +8,7 @@ import {
     CheckIcon as CheckIcon,
     PlusCircleIcon as CreateIcon
 } from '@phosphor-icons/react';
-import { db, type WorkoutExerciseDef } from '../../../lib/db';
+import { db, type WorkoutSet } from '../../../lib/db';
 import { generateId } from '../../../lib';
 import { useStackNavigation } from '../../../lib/useStackNavigation';
 import { syncWorkoutExerciseThumbnailPaths } from '../../../lib/workoutMedia';
@@ -50,6 +50,17 @@ const mediaNameFromVideoPath = (videoPath: string) => {
     const noGender = noSuffix.replace(/-(female|male)$/i, '');
     return normalizeName(noGender.replace(/-/g, ' '));
 };
+
+const buildEmptyWorkoutSetDraft = (): Omit<WorkoutSet, 'id' | 'workout_log_entry_id'> => ({
+    set_number: 1,
+    weight: 0,
+    reps: 0,
+    distance: 0,
+    duration_seconds: 0,
+    completed: false,
+    created_at: new Date(),
+    synced: 0,
+});
 
 export default function ExerciseSelector() {
     const [searchParams] = useSearchParams();
@@ -185,6 +196,58 @@ export default function ExerciseSelector() {
 
     const selectedCount = Object.values(selected).filter(Boolean).length;
 
+    const getDefaultSetsFromPreviousWorkout = async (
+        exerciseId: string,
+        currentWorkoutId: string
+    ): Promise<Array<Omit<WorkoutSet, 'id' | 'workout_log_entry_id'>>> => {
+        const exerciseEntries = await db.workout_log_entries.where('exercise_id').equals(exerciseId).toArray();
+        const candidateEntries = exerciseEntries.filter((entry) => entry.workout_id !== currentWorkoutId);
+        if (!candidateEntries.length) {
+            return [buildEmptyWorkoutSetDraft()];
+        }
+
+        const workoutIds = Array.from(new Set(candidateEntries.map((entry) => entry.workout_id)));
+        const workouts = await db.workouts.where('id').anyOf(workoutIds).toArray();
+        const workoutById = new Map(workouts.map((workout) => [workout.id, workout]));
+
+        const latestEntry = candidateEntries
+            .filter((entry) => workoutById.has(entry.workout_id))
+            .sort((a, b) => {
+                const aTime = workoutById.get(a.workout_id)?.start_time || '';
+                const bTime = workoutById.get(b.workout_id)?.start_time || '';
+                if (aTime === bTime) return b.sort_order - a.sort_order;
+                return aTime < bTime ? 1 : -1;
+            })[0];
+
+        if (!latestEntry) {
+            return [buildEmptyWorkoutSetDraft()];
+        }
+
+        const previousSets = await db.workout_sets
+            .where('workout_log_entry_id')
+            .equals(latestEntry.id)
+            .sortBy('set_number');
+
+        if (!previousSets.length) {
+            return [buildEmptyWorkoutSetDraft()];
+        }
+
+        return previousSets.map((set, index) => ({
+            set_number: index + 1,
+            weight: set.weight,
+            reps: set.reps,
+            reps_min: set.reps_min,
+            reps_max: set.reps_max,
+            distance: set.distance,
+            duration_seconds: set.duration_seconds,
+            rpe: set.rpe,
+            is_warmup: set.is_warmup,
+            completed: false,
+            created_at: new Date(),
+            synced: 0,
+        }));
+    };
+
     async function addSelectedExercises() {
         if (!workoutId && !routineId) {
             console.warn('[ExercisesList] Missing valid workoutId; skipping addSelectedExercises.');
@@ -196,9 +259,11 @@ export default function ExerciseSelector() {
         if (isReplaceMode && replaceEntryId) {
             const replacementExerciseId = ids[0];
 
-            await db.transaction('rw', [db.workout_log_entries, db.workout_sets], async () => {
+            await db.transaction('rw', [db.workout_log_entries, db.workout_sets, db.workouts], async () => {
                 const entry = await db.workout_log_entries.get(replaceEntryId);
                 if (!entry || entry.workout_id !== workoutId) return;
+
+                const setDrafts = await getDefaultSetsFromPreviousWorkout(replacementExerciseId, workoutId);
 
                 await db.workout_log_entries.update(replaceEntryId, {
                     exercise_id: replacementExerciseId,
@@ -206,6 +271,14 @@ export default function ExerciseSelector() {
                 });
 
                 await db.workout_sets.where('workout_log_entry_id').equals(replaceEntryId).delete();
+
+                for (const draft of setDrafts) {
+                    await db.workout_sets.add({
+                        id: generateId(),
+                        workout_log_entry_id: replaceEntryId,
+                        ...draft,
+                    });
+                }
             });
 
             pop();
@@ -248,16 +321,27 @@ export default function ExerciseSelector() {
         const existing = await db.workout_log_entries.where('workout_id').equals(workoutId).toArray();
         let sortOrder = (existing.map(e => e.sort_order).sort((a, b) => b - a)[0] || 0) + 1;
 
-        await db.transaction('rw', db.workout_log_entries, async () => {
+        await db.transaction('rw', [db.workout_log_entries, db.workout_sets, db.workouts], async () => {
             for (const id of ids) {
+                const workoutLogEntryId = generateId();
+                const setDrafts = await getDefaultSetsFromPreviousWorkout(id, workoutId);
+
                 await db.workout_log_entries.add({
-                    id: generateId(),
+                    id: workoutLogEntryId,
                     workout_id: workoutId,
                     exercise_id: id,
                     sort_order: sortOrder++,
                     created_at: new Date(),
                     synced: 0
                 });
+
+                for (const draft of setDrafts) {
+                    await db.workout_sets.add({
+                        id: generateId(),
+                        workout_log_entry_id: workoutLogEntryId,
+                        ...draft,
+                    });
+                }
             }
         });
 

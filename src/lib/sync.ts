@@ -130,6 +130,7 @@ export class SyncManager {
      // Need type assertion or check if table exists in db
      const tables = [
          'profiles', 'foods', 'food_ingredients', 'logs', 'goals', 'metrics', 
+         'settings',
          'activities', 'activity_logs',
          'workout_exercises_def', 'workout_rest_preferences', 'workout_routines', 'workout_routine_entries', 'workout_routine_sets',
          'workouts', 'workout_log_entries', 'workout_sets'
@@ -225,6 +226,7 @@ export class SyncManager {
             food_ingredients: 3,
             goals: 4,
             metrics: 4,
+            settings: 4,
             logs: 5,
             activities: 5,
             activity_logs: 6,
@@ -340,6 +342,14 @@ export class SyncManager {
         return match?.[1] ?? null;
     }
 
+    private isMissingRelationError(error: any): boolean {
+        return error?.code === '42P01' || (typeof error?.message === 'string' && error.message.includes('does not exist'));
+    }
+
+    private isMissingColumnError(error: any): boolean {
+        return error?.code === '42703' || error?.code === 'PGRST204';
+    }
+
     private normalizeDottedPayloadKeys(input: Record<string, any>) {
         const output: Record<string, any> = { ...input };
 
@@ -376,6 +386,7 @@ export class SyncManager {
             'logs',
             'goals',
             'metrics',
+            'settings',
             'activities',
             'activity_logs',
             'workout_exercises_def',
@@ -389,6 +400,7 @@ export class SyncManager {
             'logs',
             'goals',
             'metrics',
+            'settings',
             'activity_logs',
             'workout_rest_preferences',
             'workout_routines',
@@ -402,6 +414,7 @@ export class SyncManager {
     let supabaseTable = table;
     if (table === 'logs') supabaseTable = 'daily_logs'; 
     if (table === 'metrics') supabaseTable = 'body_metrics'; 
+    if (table === 'settings') supabaseTable = 'user_settings';
     
     // For delete, we only need the ID
     if (action === 'delete') {
@@ -462,6 +475,9 @@ export class SyncManager {
     
     // override user_id with actual authenticated user id
     if (session?.user?.id && supportsUserId) {
+         if (table === 'settings') {
+             payload.id = session.user.id;
+         }
          if (strictUserOwnedTables.has(table)) {
              payload.user_id = session.user.id;
          } else if (
@@ -609,6 +625,7 @@ export class SyncManager {
         dexie: string;
         supabase: string;
         dateField: string;
+        fallbackDateField?: string;
         public?: boolean;
         select?: string; // Limit fields if needed
     }
@@ -618,8 +635,9 @@ export class SyncManager {
         { dexie: 'foods', supabase: 'foods', dateField: 'updated_at', public: true },
         { dexie: 'food_ingredients', supabase: 'food_ingredients', dateField: 'created_at', public: true },
         { dexie: 'logs', supabase: 'daily_logs', dateField: 'created_at' },
-        { dexie: 'goals', supabase: 'goals', dateField: 'created_at' },
+        { dexie: 'goals', supabase: 'goals', dateField: 'updated_at', fallbackDateField: 'created_at' },
         { dexie: 'metrics', supabase: 'body_metrics', dateField: 'created_at' },
+        { dexie: 'settings', supabase: 'user_settings', dateField: 'updated_at' },
         { dexie: 'activities', supabase: 'activities', dateField: 'updated_at', public: true },
         { dexie: 'activity_logs', supabase: 'activity_logs', dateField: 'created_at' },
         { dexie: 'workout_exercises_def', supabase: 'workout_exercises_def', dateField: 'updated_at', public: true },
@@ -641,6 +659,8 @@ export class SyncManager {
              continue;
         }
 
+        let queryDateField = config.dateField;
+
         let page = 0;
         let fetchMore = true;
         
@@ -655,8 +675,8 @@ export class SyncManager {
                     const result = await supabase
                         .from(config.supabase)
                         .select(config.select || '*')
-                        .gt(config.dateField, lastSyncedDate)
-                        .order(config.dateField, { ascending: true })
+                        .gt(queryDateField, lastSyncedDate)
+                        .order(queryDateField, { ascending: true })
                         .order('id', { ascending: true }) // stable sort
                         .range(page * BATCH_SIZE, (page + 1) * BATCH_SIZE - 1);
                     
@@ -666,6 +686,25 @@ export class SyncManager {
                     if (!error) {
                         success = true;
                     } else {
+                        if (
+                            config.fallbackDateField &&
+                            queryDateField !== config.fallbackDateField &&
+                            this.isMissingColumnError(error) &&
+                            typeof error?.message === 'string' &&
+                            error.message.includes(`${config.supabase}.${queryDateField}`)
+                        ) {
+                            console.warn(
+                                `[SyncManager] ${config.supabase}.${queryDateField} missing; falling back to ${config.fallbackDateField} for pull sync.`
+                            );
+                            queryDateField = config.fallbackDateField;
+                            continue;
+                        }
+
+                        if (this.isMissingRelationError(error)) {
+                            console.warn(`[SyncManager] Skipping missing remote table ${config.supabase}: ${error.message}`);
+                            break;
+                        }
+
                         // If error is not network related (e.g. bad request), don't retry
                         if (error.code && !['PGRST', '500', '502', '503', '504'].some(c => error.code.startsWith(c)) && !error.message?.includes('fetch')) {
                              break;
@@ -683,6 +722,11 @@ export class SyncManager {
             }
 
             if (error || !success) {
+                if (this.isMissingRelationError(error)) {
+                    fetchMore = false;
+                    continue;
+                }
+
                 console.error(`Failed to pull ${config.supabase} after retries:`, error);
                 // If network error, stop syncing entirely
                 if (error && error.message && (error.message.includes('Load failed') || error.message.includes('Network request failed') || error.message.includes('fetch'))) {
@@ -697,13 +741,19 @@ export class SyncManager {
                 console.log(`[SyncManager] Pulled ${data.length} records for ${config.dexie} (page ${page})`);
                 
                 // Update local DB
-                const rows = (data as any[]).map(row => ({ ...row, synced: 1 }));
+                const rows = (data as any[]).map(row => {
+                    const normalizedRow = { ...row, synced: 1 };
+                    if (config.dexie === 'settings') {
+                        normalizedRow.id = 'local-settings';
+                    }
+                    return normalizedRow;
+                });
                 await db.table(config.dexie).bulkPut(rows);
                 hasChanges = true;
 
                 // Track max timestamp from the data we just received
                 for (const row of (data as any[])) {
-                    const ts = row[config.dateField];
+                    const ts = row[queryDateField];
                     if (ts > maxTimestamp) maxTimestamp = ts;
                 }
                 

@@ -68,7 +68,8 @@ create table if not exists public.goals (
   sleep_target numeric default 8,
   water_target numeric default 2000,
   weight_target numeric default 0,
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
 -- Body Metrics (Flexible)
@@ -82,6 +83,16 @@ create table if not exists public.body_metrics (
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
+-- User Settings (nutrition, meals, reminders)
+create table if not exists public.user_settings (
+  id uuid references auth.users(id) on delete cascade not null primary key,
+  user_id uuid references auth.users(id) on delete cascade not null unique,
+  nutrition jsonb not null default '{}'::jsonb,
+  meals jsonb not null default '[]'::jsonb,
+  reminders jsonb not null default '{}'::jsonb,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
 -- RLS Policies
 alter table public.profiles enable row level security;
 alter table public.foods enable row level security;
@@ -89,6 +100,7 @@ alter table public.food_ingredients enable row level security;
 alter table public.daily_logs enable row level security;
 alter table public.goals enable row level security;
 alter table public.body_metrics enable row level security;
+alter table public.user_settings enable row level security;
 
 -- Profiles: Users can read/update their own profile
 drop policy if exists "Allow users to read own profile" on public.profiles;
@@ -121,6 +133,15 @@ create policy "Allow users to manage own goals" on public.goals for all using (a
 
 drop policy if exists "Allow users to manage own metrics" on public.body_metrics;
 create policy "Allow users to manage own metrics" on public.body_metrics for all using (auth.uid() = user_id);
+
+drop policy if exists "Allow users to read own settings" on public.user_settings;
+create policy "Allow users to read own settings" on public.user_settings for select using (auth.uid() = user_id);
+
+drop policy if exists "Allow users to insert own settings" on public.user_settings;
+create policy "Allow users to insert own settings" on public.user_settings for insert with check (auth.uid() = user_id and auth.uid() = id);
+
+drop policy if exists "Allow users to update own settings" on public.user_settings;
+create policy "Allow users to update own settings" on public.user_settings for update using (auth.uid() = user_id and auth.uid() = id);
 
 -- Activities
 create table if not exists public.activities (
