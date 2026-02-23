@@ -52,7 +52,7 @@ function Layout({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
-    }, [location.pathname]);
+    }, [location.pathname, location.search, location.hash, location.key]);
 
     return (
         <div>
