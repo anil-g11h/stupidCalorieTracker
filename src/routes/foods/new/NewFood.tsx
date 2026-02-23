@@ -6,6 +6,7 @@ import { generateId } from '../../../lib';
 import { useStackNavigation } from '../../../lib/useStackNavigation';
 import { fetchGeminiNutritionProfile } from '../../../lib/gemini';
 import { supabase } from '../../../lib/supabaseClient';
+import RouteHeader from '../../../lib/components/RouteHeader';
 
 const ESSENTIAL_VITAMIN_KEYS = [
   'Vitamin A',
@@ -643,21 +644,26 @@ const CreateFood: React.FC = () => {
   }
 
   return (
-<div className="container mx-auto p-4 max-w-lg bg-page">
-      <header className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">{isEditMode ? 'Edit Food' : 'New Food'}</h1>
-        {currentUserId && (
-          <button 
-            onClick={fetchAiData}
-            disabled={isFetching || !name}
-            className={`flex items-center gap-2 text-xs px-4 py-2 rounded-lg font-bold transition-all ${
-              isFetching ? 'bg-gray-400' : 'bg-brand text-brand-fg hover:opacity-90'
-            }`}
-          >
-            {isFetching ? '⌛ Fetching...' : '✨ Magic Fill'}
-          </button>
-        )}
-      </header>
+<div className="min-h-screen bg-page pb-24 font-sans">
+      <RouteHeader
+        title={isEditMode ? 'Edit Food' : 'New Food'}
+        onBack={() => pop()}
+        rightAction={
+          currentUserId ? (
+            <button
+              onClick={fetchAiData}
+              disabled={isFetching || !name}
+              className={`flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg font-bold transition-all ${
+                isFetching ? 'bg-gray-400 text-white' : 'bg-brand text-brand-fg hover:opacity-90'
+              }`}
+            >
+              {isFetching ? '⌛ Fetching...' : '✨ Magic Fill'}
+            </button>
+          ) : null
+        }
+      />
+
+      <div className="max-w-md mx-auto p-4">
 
       {/* Smart Import Section */}
       {currentUserId && (
@@ -687,7 +693,7 @@ const CreateFood: React.FC = () => {
         </div>
       )}
 
-      <form onSubmit={(e) => e.preventDefault()} className="space-y-6">
+        <form onSubmit={(e) => e.preventDefault()} className="space-y-6">
         {/* Basic Identification */}
         <div className="space-y-3">
           <input 
@@ -963,7 +969,8 @@ const CreateFood: React.FC = () => {
             {isEditMode ? 'Update Food' : 'Save Food'}
           </button>
         </div>
-      </form>
+        </form>
+      </div>
     </div>
   );
 };

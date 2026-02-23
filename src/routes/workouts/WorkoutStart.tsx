@@ -5,6 +5,7 @@ import { PlayIcon, PlusIcon, WrenchIcon, GlobeSimpleIcon } from '@phosphor-icons
 import { db } from '../../lib/db';
 import { startRoutineAsWorkout } from '../../lib/routines';
 import { useStackNavigation } from '../../lib/useStackNavigation';
+import RouteHeader from '../../lib/components/RouteHeader';
 
 type RoutineSummary = {
   exercises: number;
@@ -14,7 +15,7 @@ type RoutineSummary = {
 const isLocalRoutine = (userId?: string) => !userId || userId === 'local-user' || userId === 'current-user';
 
 export default function WorkoutStart() {
-  const { push } = useStackNavigation();
+  const { push, pop } = useStackNavigation();
   const [startingRoutineId, setStartingRoutineId] = React.useState<string | null>(null);
 
   const routines = useLiveQuery(
@@ -74,11 +75,11 @@ export default function WorkoutStart() {
   };
 
   return (
-    <div className="pb-24 pt-4 px-4 max-w-md mx-auto bg-background min-h-screen">
-      <header className="mb-5">
-        <h1 className="text-xl font-bold text-text-main mb-2">Start Workout</h1>
-        <p className="text-sm text-text-muted">Choose how you want to start.</p>
-      </header>
+    <div className="min-h-screen bg-background pb-24 font-sans">
+      <RouteHeader title="Start Workout" onBack={() => pop()} containerClassName="max-w-md mx-auto px-4 py-3" />
+
+      <div className="pt-4 px-4 max-w-md mx-auto">
+        <p className="text-sm text-text-muted mb-5">Choose how you want to start.</p>
 
       <section className="space-y-3 mb-6">
         <Link
@@ -171,6 +172,7 @@ export default function WorkoutStart() {
           </div>
         )}
       </section>
+      </div>
     </div>
   );
 }

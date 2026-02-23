@@ -6,6 +6,7 @@ import { db, type WorkoutExerciseDef, type WorkoutRoutineSet } from '../../../li
 import { generateId } from '../../../lib';
 import { useStackNavigation } from '../../../lib/useStackNavigation';
 import { DurationScrollerInput, getMetricColumns, type MetricField } from '../components/WorkoutSetComponents';
+import RouteHeader from '../../../lib/components/RouteHeader';
 
 export default function RoutineEditor() {
   const { id } = useParams();
@@ -328,10 +329,12 @@ export default function RoutineEditor() {
   };
 
   return (
-    <div className="pb-24 pt-4 px-4 max-w-md mx-auto bg-background min-h-screen">
-      <header className="mb-5">
-        <div className="flex items-center justify-between gap-2 mb-3">
-          <h1 className="text-lg font-bold text-text-main">Routine Builder</h1>
+    <div className="min-h-screen bg-background pb-24 font-sans">
+      <RouteHeader
+        title="Routine Builder"
+        onBack={() => pop()}
+        containerClassName="max-w-md mx-auto px-4 py-3"
+        rightAction={
           <button
             onClick={handleSaveRoutine}
             disabled={isSaving}
@@ -339,8 +342,11 @@ export default function RoutineEditor() {
           >
             {isSaving ? 'Saving...' : 'Save'}
           </button>
-        </div>
+        }
+      />
 
+      <div className="px-4 pt-4 max-w-md mx-auto">
+        <div className="mb-5">
         <input
           value={routine?.name || ''}
           onChange={(event) => void handleNameChange(event.target.value)}
@@ -350,7 +356,7 @@ export default function RoutineEditor() {
         <p className="mt-2 text-xs font-medium text-text-muted">
           {summary.exerciseCount} exercise{summary.exerciseCount === 1 ? '' : 's'} • {summary.setCount} set{summary.setCount === 1 ? '' : 's'}
         </p>
-      </header>
+        </div>
 
       {!entries ? (
         <p className="text-sm text-text-muted">Loading routine...</p>
@@ -451,6 +457,7 @@ export default function RoutineEditor() {
           </button>
         </div>
       )}
+      </div>
     </div>
   );
 }

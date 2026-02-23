@@ -19,7 +19,14 @@ function Layout({ children }: { children: React.ReactNode }) {
         ? 'calc(5.25rem + env(safe-area-inset-bottom))'
         : 'calc(10.5rem + env(safe-area-inset-bottom))';
     const isPrimaryTabRoute = location.pathname === '/' || location.pathname === '/log' || location.pathname === '/workouts' || location.pathname === '/profile';
-    const shouldShowBackButton = !isPrimaryTabRoute;
+    const hasInPageBackButton =
+        location.pathname.startsWith('/log/add') ||
+        location.pathname.startsWith('/foods/new') ||
+        location.pathname === '/workouts/exercises' ||
+        /^\/workouts\/exercises\/[a-zA-Z0-9_-]+$/.test(location.pathname) ||
+        /^\/workouts\/routines\/[a-zA-Z0-9_-]+$/.test(location.pathname) ||
+        /^\/workouts\/[a-zA-Z0-9_-]+$/.test(location.pathname);
+    const shouldShowBackButton = !isPrimaryTabRoute && !hasInPageBackButton;
     const topBackOffset = 'calc(0.75rem + env(safe-area-inset-top))';
     const topContentOffset = 'calc(3.5rem + env(safe-area-inset-top))';
 

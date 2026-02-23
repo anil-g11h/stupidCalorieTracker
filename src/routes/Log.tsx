@@ -10,6 +10,7 @@ import {
 import { useSearchParams, Link } from 'react-router-dom';
 import { db, type DailyLog, type Food } from '../lib/db';
 import { analyzeEaaRatio } from '../lib/eaa';
+import RouteHeader from '../lib/components/RouteHeader';
 
 const SETTINGS_KEY = 'stupid_tracker_settings_v1';
 const SETTINGS_ID = 'local-settings';
@@ -768,45 +769,46 @@ export default function DailyLogPage() {
 
   return (
     <div className="min-h-screen bg-page pb-20 font-sans">
-      <header className="bg-card shadow-sm sticky top-0 z-10 border-b border-border-subtle">
-        <div className="max-w-md mx-auto px-4 py-3 flex justify-between items-center">
-          <h1 className="text-xl font-bold text-text-main">Daily Log</h1>
+      <RouteHeader
+        title="Daily Log"
+        rightAction={
+          <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between w-auto bg-surface rounded-full px-1 py-1 border border-border-subtle shadow-sm">
+              <button
+                onClick={() => changeDate(-1)}
+                className="p-2 hover:bg-card rounded-full transition-colors text-text-muted hover:text-text-main"
+              >
+                <ChevronLeft size={18} />
+              </button>
 
-          <div className="flex items-center justify-between w-auto bg-surface rounded-full px-1 py-1 border border-border-subtle shadow-sm">
-            <button
-              onClick={() => changeDate(-1)}
-              className="p-2 hover:bg-card rounded-full transition-colors text-text-muted hover:text-text-main"
-            >
-              <ChevronLeft size={18} />
-            </button>
+              <div className="flex flex-col items-center px-4 cursor-pointer relative group">
+                <input
+                  type="date"
+                  value={date}
+                  onChange={(e) => setSearchParams({ date: e.target.value })}
+                  className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                />
+                <span className="text-sm font-bold text-text-main leading-none flex items-center gap-1.5">
+                  <Calendar size={12} className="text-brand" />
+                  {isToday ? 'Today' : displayDate}
+                </span>
+                {!isToday && <span className="text-[10px] text-text-muted leading-none mt-0.5">{displayDate}</span>}
+              </div>
 
-            <div className="flex flex-col items-center px-4 cursor-pointer relative group">
-              <input
-                type="date"
-                value={date}
-                onChange={(e) => setSearchParams({ date: e.target.value })}
-                className="absolute inset-0 opacity-0 cursor-pointer z-10"
-              />
-              <span className="text-sm font-bold text-text-main leading-none flex items-center gap-1.5">
-                <Calendar size={12} className="text-brand" />
-                {isToday ? 'Today' : displayDate}
-              </span>
-              {!isToday && <span className="text-[10px] text-text-muted leading-none mt-0.5">{displayDate}</span>}
+              <button
+                onClick={() => changeDate(1)}
+                className="p-2 hover:bg-card rounded-full transition-colors text-text-muted hover:text-text-main"
+              >
+                <ChevronRight size={18} />
+              </button>
             </div>
 
-            <button
-              onClick={() => changeDate(1)}
-              className="p-2 hover:bg-card rounded-full transition-colors text-text-muted hover:text-text-main"
-            >
-              <ChevronRight size={18} />
-            </button>
+            <Link to="/foods" className="text-text-muted hover:text-brand transition-colors p-2">
+              <Utensils size={20} />
+            </Link>
           </div>
-
-          <Link to="/foods" className="text-text-muted hover:text-brand transition-colors p-2">
-            <Utensils size={20} />
-          </Link>
-        </div>
-      </header>
+        }
+      />
 
       <main className="max-w-md mx-auto p-4 space-y-5">
         <div className="bg-card rounded-2xl shadow-sm p-4 border border-border-subtle mb-4">

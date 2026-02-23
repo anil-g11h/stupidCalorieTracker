@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import Auth from '../../lib/components/Auth';
+import RouteHeader from '../../lib/components/RouteHeader';
 import { NutritionSection } from './components/NutritionSection';
 import { DietarySection } from './components/DietarySection';
 import { MealsSection } from './components/MealsSection';
@@ -62,11 +63,7 @@ export default function ProfileSettings() {
   if (!session) {
     return (
       <div className="min-h-screen bg-page pb-24">
-        <header className="bg-card shadow-sm sticky top-0 z-10 border-b border-border-subtle">
-          <div className="max-w-md mx-auto px-4 py-3">
-            <h1 className="text-xl font-bold text-text-main">Profile</h1>
-          </div>
-        </header>
+        <RouteHeader title="Profile" />
         <div className="px-4 max-w-md mx-auto mt-8">
           <div className="bg-card p-5 rounded-2xl border border-border-subtle">
             <h2 className="text-base font-bold text-text-main mb-3">Sign in</h2>
@@ -79,17 +76,17 @@ export default function ProfileSettings() {
 
   return (
     <div className="min-h-screen bg-page pb-24">
-      <header className="bg-card shadow-sm sticky top-0 z-10 border-b border-border-subtle">
-        <div className="max-w-md mx-auto px-4 py-3 flex items-center justify-between">
-          <h1 className="text-xl font-bold text-text-main">Profile Settings</h1>
+      <RouteHeader
+        title="Profile Settings"
+        rightAction={
           <button
             className="px-3 py-1.5 rounded-full text-xs font-bold bg-surface text-text-muted hover:text-text-main border border-border-subtle transition-colors"
             onClick={() => supabase.auth.signOut()}
           >
             Sign Out
           </button>
-        </div>
-      </header>
+        }
+      />
 
       <main className="max-w-md mx-auto p-4 space-y-5">
         <form onSubmit={saveAllSettings} className="space-y-5">

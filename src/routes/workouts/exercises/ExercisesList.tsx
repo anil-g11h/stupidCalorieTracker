@@ -11,6 +11,7 @@ import { db, type WorkoutSet } from '../../../lib/db';
 import { generateId } from '../../../lib';
 import { useStackNavigation } from '../../../lib/useStackNavigation';
 import { syncWorkoutExerciseThumbnailPaths } from '../../../lib/workoutMedia';
+import RouteHeader from '../../../lib/components/RouteHeader';
 
 const MUSCLE_GROUPS = ['Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Core', 'Cardio', 'Other'];
 const EQUIPMENT_TYPES = ['Barbell', 'Dumbbell', 'Machine', 'Cable', 'Bodyweight', 'Kettlebell', 'Band', 'None'];
@@ -366,23 +367,28 @@ export default function ExerciseSelector() {
     };
 
     return (
-        <div className="pb-24 pt-4 px-4 max-w-md mx-auto bg-background min-h-screen">
-            {/* Header */}
-            <header className="flex items-center justify-between mb-6">
-                <h1 className="text-text-main font-bold text-lg">{isReplaceMode ? 'Replace Exercise' : 'Add Exercises'}</h1>
-                <button
-                    onClick={() => push(
-                        routineId
-                            ? `/workouts/exercises/new?routineId=${encodeURIComponent(routineId)}`
-                            : workoutId
-                            ? `/workouts/exercises/new?workoutId=${encodeURIComponent(workoutId)}${replaceEntryId ? `&replaceEntryId=${encodeURIComponent(replaceEntryId)}` : ''}`
-                            : '/workouts/exercises/new'
-                    )}
-                    className="text-brand p-2 bg-brand/10 rounded-full hover:bg-brand/20 transition-colors"
-                >
-                    <CreateIcon size={22} weight="bold" />
-                </button>
-            </header>
+        <div className="min-h-screen bg-background pb-24 font-sans">
+            <RouteHeader
+                title={isReplaceMode ? 'Replace Exercise' : 'Add Exercises'}
+                onBack={() => pop()}
+                containerClassName="max-w-md mx-auto px-4 py-3"
+                rightAction={
+                    <button
+                        onClick={() => push(
+                            routineId
+                                ? `/workouts/exercises/new?routineId=${encodeURIComponent(routineId)}`
+                                : workoutId
+                                ? `/workouts/exercises/new?workoutId=${encodeURIComponent(workoutId)}${replaceEntryId ? `&replaceEntryId=${encodeURIComponent(replaceEntryId)}` : ''}`
+                                : '/workouts/exercises/new'
+                        )}
+                        className="text-brand p-2 bg-brand/10 rounded-full hover:bg-brand/20 transition-colors"
+                    >
+                        <CreateIcon size={22} weight="bold" />
+                    </button>
+                }
+            />
+
+            <div className="pt-4 px-4 max-w-md mx-auto">
 
             {import.meta.env.DEV ? (
                 <div className="mb-4">
@@ -506,6 +512,7 @@ export default function ExerciseSelector() {
                     </button>
                 </div>
             )}
+            </div>
         </div>
     );
 }

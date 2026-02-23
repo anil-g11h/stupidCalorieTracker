@@ -5,6 +5,7 @@ import { db } from '../../../../lib/db';
 import { generateId } from '../../../../lib';
 import { METRIC_TYPES, type MetricType } from '../../../../lib/workouts';
 import { useStackNavigation } from '../../../../lib/useStackNavigation';
+import RouteHeader from '../../../../lib/components/RouteHeader';
 
 // Constants moved outside component to prevent re-renders
 const MUSCLE_GROUPS = ['Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Core', 'Cardio', 'Other'];
@@ -55,11 +56,12 @@ export default function NewExercise() {
     };
 
     return (
-        <div className="max-w-md mx-auto pt-8 pb-24 px-4 bg-background min-h-screen">
-            {/* Added the 'transition-create-btn' class here */}
+        <div className="min-h-screen bg-background pb-24 font-sans">
+            <RouteHeader title="Create New Exercise" onBack={() => pop()} containerClassName="max-w-md mx-auto px-4 py-3" />
+
+            <div className="max-w-md mx-auto pt-4 px-4">
             <div className="bg-card p-6 rounded-2xl border border-border-subtle shadow-sm transition-create-btn">
                 <header className="mb-6">
-                    <h2 className="text-xl font-bold text-center text-text-main">Create New Exercise</h2>
                     <p className="text-xs text-text-muted text-center mt-1">
                         Define a custom exercise to track in your workouts.
                     </p>
@@ -131,6 +133,7 @@ export default function NewExercise() {
                         Save Exercise
                     </button>
                 </div>
+            </div>
             </div>
         </div>
     );

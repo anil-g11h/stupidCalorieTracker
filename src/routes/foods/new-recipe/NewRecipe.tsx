@@ -15,6 +15,8 @@ import {
 import { supabase } from '../../../lib/supabaseClient';
 import { analyzeEaaRatio, type EaaInputItem } from '../../../lib/eaa';
 import { fetchGeminiRecipeIngredients } from '../../../lib/gemini';
+import { useStackNavigation } from '../../../lib/useStackNavigation';
+import RouteHeader from '../../../lib/components/RouteHeader';
 
 const DEFAULT_EAA_TO_PROTEIN_RATIO = 0.35;
 
@@ -341,6 +343,7 @@ const buildShoppingListItems = (rankedMeals: RankedMealSuggestion[]): ShoppingLi
 
 export default function CreateRecipe() {
   const navigate = useNavigate();
+  const { pop } = useStackNavigation();
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const today = useMemo(() => new Date().toISOString().split('T')[0], []);
 
@@ -857,8 +860,10 @@ export default function CreateRecipe() {
   };
 
   return (
-    <div className="container mx-auto p-4 max-w-lg">
-      <h1 className="text-2xl font-bold mb-6">Create New Recipe</h1>
+    <div className="min-h-screen bg-page pb-24 font-sans">
+      <RouteHeader title="Create New Recipe" onBack={() => pop()} />
+
+      <div className="max-w-md mx-auto p-4">
 
       <div className="mb-4 rounded-xl border border-border-subtle bg-card p-3 space-y-3">
         <h2 className="text-sm font-bold text-text-main">Spoonacular Recipe Nutrition Logging</h2>
@@ -1177,6 +1182,7 @@ export default function CreateRecipe() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../../lib/db';
+import { useStackNavigation } from '../../../lib/useStackNavigation';
+import RouteHeader from '../../../lib/components/RouteHeader';
 
 type WorkoutMediaEntry = {
   sourceId: string;
@@ -77,6 +79,7 @@ const estimateOneRepMax = (weight: number, reps: number) => {
 
 export default function ExerciseDetails() {
   const { id } = useParams();
+  const { pop } = useStackNavigation();
   const [fallback, setFallback] = useState<{ videoPath?: string; thumbnailPath?: string }>({});
   const [activeTab, setActiveTab] = useState<'summary' | 'history'>('summary');
   const [summaryChartMetric, setSummaryChartMetric] = useState<SummaryChartMetric>('heaviest');
@@ -373,25 +376,31 @@ export default function ExerciseDetails() {
 
   if (exercise === undefined) {
     return (
-      <div className="pb-32 pt-4 px-4 max-w-md mx-auto min-h-screen bg-background">
-        <div className="rounded-2xl border border-border-subtle bg-card p-4 shadow-sm text-sm text-text-muted">Loading exercise...</div>
+      <div className="min-h-screen bg-background pb-32 font-sans">
+        <RouteHeader title="Exercise" onBack={() => pop()} containerClassName="max-w-md mx-auto px-4 py-3" />
+        <div className="px-4 pt-4 max-w-md mx-auto">
+          <div className="rounded-2xl border border-border-subtle bg-card p-4 shadow-sm text-sm text-text-muted">Loading exercise...</div>
+        </div>
       </div>
     );
   }
 
   if (!exercise) {
     return (
-      <div className="pb-32 pt-4 px-4 max-w-md mx-auto min-h-screen bg-background">
-        <div className="rounded-2xl border border-border-subtle bg-card p-4 shadow-sm text-sm text-text-muted">Exercise not found.</div>
+      <div className="min-h-screen bg-background pb-32 font-sans">
+        <RouteHeader title="Exercise" onBack={() => pop()} containerClassName="max-w-md mx-auto px-4 py-3" />
+        <div className="px-4 pt-4 max-w-md mx-auto">
+          <div className="rounded-2xl border border-border-subtle bg-card p-4 shadow-sm text-sm text-text-muted">Exercise not found.</div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="pb-32 pt-4 px-4 max-w-md mx-auto min-h-screen bg-background space-y-4">
-      <header className="mb-6 sticky top-0 bg-background z-20 py-2 -mx-4 px-4">
-        <h1 className="text-xl font-bold truncate">{exercise.name}</h1>
-      </header>
+    <div className="min-h-screen bg-background pb-32 font-sans">
+      <RouteHeader title={exercise.name} onBack={() => pop()} containerClassName="max-w-md mx-auto px-4 py-3" />
+
+      <div className="px-4 pt-4 max-w-md mx-auto space-y-4">
 
       <section>
         <div className="flex items-center gap-6 border-b border-border-subtle">
@@ -599,6 +608,7 @@ export default function ExerciseDetails() {
           )}
         </section>
       )}
+      </div>
     </div>
   );
 }

@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Link } from 'react-router-dom';
-import { CaretLeftIcon } from '@phosphor-icons/react';
+import { useSearchParams } from 'react-router-dom';
 import { db, type BodyMetric, type Food, type UserSettings } from '../lib/db';
 import { generateId } from '../lib';
 import { supabase } from '../lib/supabaseClient';
 import { useStackNavigation } from '../lib/useStackNavigation';
+import RouteHeader from '../lib/components/RouteHeader';
 
 type SettingsRow = UserSettings & { id: 'local-settings' };
 
@@ -60,15 +60,25 @@ const WATER_PORTION_OPTIONS = [
 ];
 
 const DEFAULT_FIRST_WEIGHT_KG = 70;
+const HOME_PANELS = ['weight', 'water', 'sleep'] as const;
+type HomePanel = (typeof HOME_PANELS)[number];
+
+function isHomePanel(value: string | null): value is HomePanel {
+  return value !== null && HOME_PANELS.includes(value as HomePanel);
+}
 
 export default function Home() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const { push } = useStackNavigation();
   const now = new Date();
   const today = useMemo(() => toYyyyMmDd(now), [now]);
   const weekStartIso = useMemo(() => getWeekStart(now).toISOString(), [now]);
   const [currentUserId, setCurrentUserId] = useState<string>('local-user');
   const [daySummary, setDaySummary] = useState('');
-  const [activeHomePanel, setActiveHomePanel] = useState<'weight' | 'water' | 'sleep' | null>(null);
+  const [activeHomePanel, setActiveHomePanel] = useState<HomePanel | null>(() => {
+    const panelFromQuery = searchParams.get('panel');
+    return isHomePanel(panelFromQuery) ? panelFromQuery : null;
+  });
   const [weightForm, setWeightForm] = useState({
     date: today,
     value: '',
@@ -345,6 +355,12 @@ export default function Home() {
     window.localStorage.setItem(summaryStorageKey(today), daySummary);
   }, [today, daySummary]);
 
+  useEffect(() => {
+    const panelFromQuery = searchParams.get('panel');
+    const nextPanel = isHomePanel(panelFromQuery) ? panelFromQuery : null;
+    setActiveHomePanel((prev) => (prev === nextPanel ? prev : nextPanel));
+  }, [searchParams]);
+
   const saveWeightMetric = async (valueInput: number, dateInput?: string, unitInput?: string) => {
     const value = Number(valueInput);
     const unit = unitInput || weightForm.unit;
@@ -537,7 +553,21 @@ export default function Home() {
     }
   };
 
-  const setPanelWithTransition = (panel: 'weight' | 'water' | 'sleep' | null, direction: 'forward' | 'backward') => {
+  const setPanelWithTransition = (panel: HomePanel | null, direction: 'forward' | 'backward') => {
+    const shouldReplace = panel === null || (activeHomePanel !== null && panel !== null);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (panel) {
+          next.set('panel', panel);
+        } else {
+          next.delete('panel');
+        }
+        return next;
+      },
+      { replace: shouldReplace }
+    );
+
     if (!document.startViewTransition) {
       setActiveHomePanel(panel);
       return;
@@ -555,23 +585,7 @@ export default function Home() {
   if (activeHomePanel === 'weight') {
     return (
       <div className="min-h-screen bg-page pb-24 font-sans">
-        <header className="bg-card shadow-sm sticky top-0 z-10 border-b border-border-subtle">
-          <div className="max-w-md mx-auto px-4 py-3 flex items-center justify-between gap-3">
-            <button
-              type="button"
-              onClick={() => setPanelWithTransition(null, 'backward')}
-              className="h-9 w-9 rounded-lg border border-border-subtle bg-surface text-text-main flex items-center justify-center"
-              aria-label="Back"
-            >
-              <CaretLeftIcon size={18} weight="bold" />
-            </button>
-            <div>
-              <h1 className="text-2xl font-extrabold text-text-main">Weight log</h1>
-              <p className="text-xs text-text-muted mt-0.5">Add and review your recent entries</p>
-            </div>
-            <div className="h-9 w-9" />
-          </div>
-        </header>
+        <RouteHeader title="Weight log" onBack={() => setPanelWithTransition(null, 'backward')} />
 
         <main className="max-w-md mx-auto p-4">
           <section className="bg-card rounded-2xl p-5 border border-border-subtle shadow-sm">
@@ -787,23 +801,7 @@ export default function Home() {
   if (activeHomePanel === 'water') {
     return (
       <div className="min-h-screen bg-page pb-24 font-sans">
-        <header className="bg-card shadow-sm sticky top-0 z-10 border-b border-border-subtle">
-          <div className="max-w-md mx-auto px-4 py-3 flex items-center justify-between gap-3">
-            <button
-              type="button"
-              onClick={() => setPanelWithTransition(null, 'backward')}
-              className="h-9 w-9 rounded-lg border border-border-subtle bg-surface text-text-main flex items-center justify-center"
-              aria-label="Back"
-            >
-              <CaretLeftIcon size={18} weight="bold" />
-            </button>
-            <div>
-              <h1 className="text-2xl font-extrabold text-text-main">Water tracker</h1>
-              <p className="text-xs text-text-muted mt-0.5">Add and review water intake</p>
-            </div>
-            <div className="h-9 w-9" />
-          </div>
-        </header>
+        <RouteHeader title="Water tracker" onBack={() => setPanelWithTransition(null, 'backward')} />
 
         <main className="max-w-md mx-auto p-4">
           <section className="bg-card rounded-2xl p-5 border border-border-subtle shadow-sm">
@@ -870,23 +868,7 @@ export default function Home() {
   if (activeHomePanel === 'sleep') {
     return (
       <div className="min-h-screen bg-page pb-24 font-sans">
-        <header className="bg-card shadow-sm sticky top-0 z-10 border-b border-border-subtle">
-          <div className="max-w-md mx-auto px-4 py-3 flex items-center justify-between gap-3">
-            <button
-              type="button"
-              onClick={() => setPanelWithTransition(null, 'backward')}
-              className="h-9 w-9 rounded-lg border border-border-subtle bg-surface text-text-main flex items-center justify-center"
-              aria-label="Back"
-            >
-              <CaretLeftIcon size={18} weight="bold" />
-            </button>
-            <div>
-              <h1 className="text-2xl font-extrabold text-text-main">Sleep tracker</h1>
-              <p className="text-xs text-text-muted mt-0.5">Add and review sleep hours</p>
-            </div>
-            <div className="h-9 w-9" />
-          </div>
-        </header>
+        <RouteHeader title="Sleep tracker" onBack={() => setPanelWithTransition(null, 'backward')} />
 
         <main className="max-w-md mx-auto p-4">
           <section className="bg-card rounded-2xl p-5 border border-border-subtle shadow-sm">
@@ -938,12 +920,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-page pb-24 font-sans">
-      <header className="bg-card shadow-sm sticky top-0 z-10 border-b border-border-subtle">
-        <div className="max-w-md mx-auto px-4 py-3">
-          <h1 className="text-2xl font-extrabold text-text-main">Dashboard</h1>
-          <p className="text-xs text-text-muted mt-0.5">Today&apos;s overview across calories and workouts</p>
-        </div>
-      </header>
+      <RouteHeader title="Dashboard" />
 
       <main className="max-w-md mx-auto p-4 space-y-4">
         <button
