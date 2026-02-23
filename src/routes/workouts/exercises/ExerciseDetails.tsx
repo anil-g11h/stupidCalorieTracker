@@ -1,9 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { CaretLeftIcon as CaretLeft } from '@phosphor-icons/react';
 import { db } from '../../../lib/db';
-import { useStackNavigation } from '../../../lib/useStackNavigation';
 
 type WorkoutMediaEntry = {
   sourceId: string;
@@ -79,7 +77,6 @@ const estimateOneRepMax = (weight: number, reps: number) => {
 
 export default function ExerciseDetails() {
   const { id } = useParams();
-  const { pop } = useStackNavigation();
   const [fallback, setFallback] = useState<{ videoPath?: string; thumbnailPath?: string }>({});
   const [activeTab, setActiveTab] = useState<'summary' | 'history'>('summary');
   const [summaryChartMetric, setSummaryChartMetric] = useState<SummaryChartMetric>('heaviest');
@@ -385,13 +382,6 @@ export default function ExerciseDetails() {
   if (!exercise) {
     return (
       <div className="pb-32 pt-4 px-4 max-w-md mx-auto min-h-screen bg-background">
-        <button
-          onClick={() => pop()}
-          className="mb-4 h-9 w-9 rounded-lg border border-border-subtle bg-surface text-text-main flex items-center justify-center"
-          aria-label="Back"
-        >
-          <CaretLeft size={18} />
-        </button>
         <div className="rounded-2xl border border-border-subtle bg-card p-4 shadow-sm text-sm text-text-muted">Exercise not found.</div>
       </div>
     );
@@ -400,16 +390,7 @@ export default function ExerciseDetails() {
   return (
     <div className="pb-32 pt-4 px-4 max-w-md mx-auto min-h-screen bg-background space-y-4">
       <header className="mb-6 sticky top-0 bg-background z-20 py-2 -mx-4 px-4">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => pop()}
-            className="h-9 w-9 rounded-lg border border-border-subtle bg-surface text-text-main flex items-center justify-center"
-            aria-label="Back"
-          >
-            <CaretLeft size={18} />
-          </button>
-          <h1 className="text-xl font-bold truncate">{exercise.name}</h1>
-        </div>
+        <h1 className="text-xl font-bold truncate">{exercise.name}</h1>
       </header>
 
       <section>

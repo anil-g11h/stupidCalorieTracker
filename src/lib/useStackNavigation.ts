@@ -32,7 +32,7 @@ export function useStackNavigation() {
 
   return {
     push: (to: string) => navigateWithTransition(to, 'forward'),
-    pop: (to: string | number = -1) => navigateWithTransition(to, 'backward'),
+    pop: () => navigateWithTransition(-1, 'backward'),
     // New: for the BottomNav logic
     goToTab: (to: string, dir: 'forward' | 'backward') => navigateWithTransition(to, dir)
   };

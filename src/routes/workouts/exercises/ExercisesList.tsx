@@ -3,7 +3,6 @@ import { useSearchParams, Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
     PlusIcon as PlusIcon,
-    CaretLeftIcon as CaretLeftIcon,
     MagnifyingGlassIcon as SearchIcon,
     CheckIcon as CheckIcon,
     PlusCircleIcon as CreateIcon
@@ -370,19 +369,6 @@ export default function ExerciseSelector() {
         <div className="pb-24 pt-4 px-4 max-w-md mx-auto bg-background min-h-screen">
             {/* Header */}
             <header className="flex items-center justify-between mb-6">
-                <button
-                    className="text-brand font-bold text-sm flex items-center gap-1 hover:opacity-70 transition-opacity"
-                    onClick={() => {
-                        if (routineId) {
-                            pop(`/workouts/routines/${routineId}`);
-                            return;
-                        }
-                        pop(workoutId ? `/workouts/${workoutId}` : '/workouts');
-                    }}
-                >
-                    <CaretLeftIcon weight="bold" />
-                    Cancel
-                </button>
                 <h1 className="text-text-main font-bold text-lg">{isReplaceMode ? 'Replace Exercise' : 'Add Exercises'}</h1>
                 <button
                     onClick={() => push(

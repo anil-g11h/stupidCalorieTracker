@@ -1,7 +1,7 @@
 import React from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Link } from 'react-router-dom';
-import { ArrowLeftIcon, PlayIcon, PlusIcon, WrenchIcon, GlobeSimpleIcon } from '@phosphor-icons/react';
+import { PlayIcon, PlusIcon, WrenchIcon, GlobeSimpleIcon } from '@phosphor-icons/react';
 import { db } from '../../lib/db';
 import { startRoutineAsWorkout } from '../../lib/routines';
 import { useStackNavigation } from '../../lib/useStackNavigation';
@@ -14,7 +14,7 @@ type RoutineSummary = {
 const isLocalRoutine = (userId?: string) => !userId || userId === 'local-user' || userId === 'current-user';
 
 export default function WorkoutStart() {
-  const { push, pop } = useStackNavigation();
+  const { push } = useStackNavigation();
   const [startingRoutineId, setStartingRoutineId] = React.useState<string | null>(null);
 
   const routines = useLiveQuery(
@@ -76,15 +76,7 @@ export default function WorkoutStart() {
   return (
     <div className="pb-24 pt-4 px-4 max-w-md mx-auto bg-background min-h-screen">
       <header className="mb-5">
-        <div className="flex items-center gap-3 mb-2">
-          <button
-            onClick={() => pop('/workouts')}
-            className="h-9 w-9 rounded-lg border border-border-subtle bg-surface text-text-main flex items-center justify-center"
-          >
-            <ArrowLeftIcon size={16} />
-          </button>
-          <h1 className="text-xl font-bold text-text-main">Start Workout</h1>
-        </div>
+        <h1 className="text-xl font-bold text-text-main mb-2">Start Workout</h1>
         <p className="text-sm text-text-muted">Choose how you want to start.</p>
       </header>
 

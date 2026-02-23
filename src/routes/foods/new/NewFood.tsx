@@ -592,7 +592,7 @@ const CreateFood: React.FC = () => {
         const existingFood = await db.foods.get(editFoodId);
         if (!existingFood) {
           alert('Food not found');
-          pop('/foods');
+          pop();
           return;
         }
 
@@ -635,7 +635,7 @@ const CreateFood: React.FC = () => {
         });
       }
 
-      pop('/foods');
+      pop();
     } catch (error) {
       console.error('Failed to save food:', error);
       alert('Failed to save food');

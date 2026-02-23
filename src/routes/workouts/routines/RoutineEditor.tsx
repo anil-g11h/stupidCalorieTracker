@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { PlusIcon, TrashIcon, CaretLeftIcon } from '@phosphor-icons/react';
+import { PlusIcon, TrashIcon } from '@phosphor-icons/react';
 import { db, type WorkoutExerciseDef, type WorkoutRoutineSet } from '../../../lib/db';
 import { generateId } from '../../../lib';
 import { useStackNavigation } from '../../../lib/useStackNavigation';
@@ -261,7 +261,7 @@ export default function RoutineEditor() {
 
       setHasSavedRoutine(true);
 
-      pop('/workouts');
+      pop();
     } catch (error) {
       console.error('Failed to save routine:', error);
       alert('Could not save this routine.');
@@ -331,9 +331,6 @@ export default function RoutineEditor() {
     <div className="pb-24 pt-4 px-4 max-w-md mx-auto bg-background min-h-screen">
       <header className="mb-5">
         <div className="flex items-center justify-between gap-2 mb-3">
-          <button onClick={() => pop('/workouts')} className="h-9 w-9 rounded-lg border border-border-subtle bg-surface text-text-main flex items-center justify-center">
-            <CaretLeftIcon size={16} />
-          </button>
           <h1 className="text-lg font-bold text-text-main">Routine Builder</h1>
           <button
             onClick={handleSaveRoutine}

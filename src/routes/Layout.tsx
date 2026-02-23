@@ -19,8 +19,7 @@ function Layout({ children }: { children: React.ReactNode }) {
         ? 'calc(5.25rem + env(safe-area-inset-bottom))'
         : 'calc(10.5rem + env(safe-area-inset-bottom))';
     const isPrimaryTabRoute = location.pathname === '/' || location.pathname === '/log' || location.pathname === '/workouts' || location.pathname === '/profile';
-    const isWorkoutSessionRoute = /^\/workouts\/[^/]+$/.test(location.pathname);
-    const shouldShowBackButton = !isPrimaryTabRoute && !isWorkoutSessionRoute;
+    const shouldShowBackButton = !isPrimaryTabRoute;
     const topBackOffset = 'calc(0.75rem + env(safe-area-inset-top))';
     const topContentOffset = 'calc(3.5rem + env(safe-area-inset-top))';
 

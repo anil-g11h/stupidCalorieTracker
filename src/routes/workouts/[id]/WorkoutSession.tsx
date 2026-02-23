@@ -684,7 +684,7 @@ const WorkoutSessionComponent = () => {
                     });
                     return;
                   }
-                  pop('/workouts');
+                  pop();
                 }}
                 className="h-9 w-9 rounded-lg border border-border-subtle bg-surface text-text-main flex items-center justify-center"
                 aria-label="Back"

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { CaretLeftIcon, FloppyDiskIcon as SaveIcon } from '@phosphor-icons/react';
+import { FloppyDiskIcon as SaveIcon } from '@phosphor-icons/react';
 import { db } from '../../../../lib/db';
 import { generateId } from '../../../../lib';
 import { METRIC_TYPES, type MetricType } from '../../../../lib/workouts';
@@ -53,16 +53,6 @@ export default function NewExercise() {
             console.error("Failed to create exercise:", error);
         }
     };
-
-    const handleBack = () => {
-        document.documentElement.classList.add('transition-backward');
-
-        document.startViewTransition(() => {
-            navigate(-1);
-            document.documentElement.classList.remove('transition-backward');
-        });
-    };
-
 
     return (
         <div className="max-w-md mx-auto pt-8 pb-24 px-4 bg-background min-h-screen">
@@ -139,11 +129,6 @@ export default function NewExercise() {
                     >
                         <SaveIcon size={20} weight="bold" />
                         Save Exercise
-                    </button>
-
-                    <button onClick={() => pop()} className="w-full py-3 text-text-muted font-medium hover:text-text-main transition-colors flex items-center justify-center gap-1">
-                        <CaretLeftIcon weight="bold" />
-                        Back to List
                     </button>
                 </div>
             </div>

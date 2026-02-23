@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Link } from 'react-router-dom';
+import { CaretLeftIcon } from '@phosphor-icons/react';
 import { db, type BodyMetric, type Food, type UserSettings } from '../lib/db';
 import { generateId } from '../lib';
 import { supabase } from '../lib/supabaseClient';
@@ -556,17 +557,19 @@ export default function Home() {
       <div className="min-h-screen bg-page pb-24 font-sans">
         <header className="bg-card shadow-sm sticky top-0 z-10 border-b border-border-subtle">
           <div className="max-w-md mx-auto px-4 py-3 flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => setPanelWithTransition(null, 'backward')}
+              className="h-9 w-9 rounded-lg border border-border-subtle bg-surface text-text-main flex items-center justify-center"
+              aria-label="Back"
+            >
+              <CaretLeftIcon size={18} weight="bold" />
+            </button>
             <div>
               <h1 className="text-2xl font-extrabold text-text-main">Weight log</h1>
               <p className="text-xs text-text-muted mt-0.5">Add and review your recent entries</p>
             </div>
-            <button
-              type="button"
-              onClick={() => setPanelWithTransition(null, 'backward')}
-              className="text-xs font-medium text-text-muted hover:text-text-main"
-            >
-              Back
-            </button>
+            <div className="h-9 w-9" />
           </div>
         </header>
 
@@ -786,17 +789,19 @@ export default function Home() {
       <div className="min-h-screen bg-page pb-24 font-sans">
         <header className="bg-card shadow-sm sticky top-0 z-10 border-b border-border-subtle">
           <div className="max-w-md mx-auto px-4 py-3 flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => setPanelWithTransition(null, 'backward')}
+              className="h-9 w-9 rounded-lg border border-border-subtle bg-surface text-text-main flex items-center justify-center"
+              aria-label="Back"
+            >
+              <CaretLeftIcon size={18} weight="bold" />
+            </button>
             <div>
               <h1 className="text-2xl font-extrabold text-text-main">Water tracker</h1>
               <p className="text-xs text-text-muted mt-0.5">Add and review water intake</p>
             </div>
-            <button
-              type="button"
-              onClick={() => setPanelWithTransition(null, 'backward')}
-              className="text-xs font-medium text-text-muted hover:text-text-main"
-            >
-              Back
-            </button>
+            <div className="h-9 w-9" />
           </div>
         </header>
 
@@ -867,17 +872,19 @@ export default function Home() {
       <div className="min-h-screen bg-page pb-24 font-sans">
         <header className="bg-card shadow-sm sticky top-0 z-10 border-b border-border-subtle">
           <div className="max-w-md mx-auto px-4 py-3 flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => setPanelWithTransition(null, 'backward')}
+              className="h-9 w-9 rounded-lg border border-border-subtle bg-surface text-text-main flex items-center justify-center"
+              aria-label="Back"
+            >
+              <CaretLeftIcon size={18} weight="bold" />
+            </button>
             <div>
               <h1 className="text-2xl font-extrabold text-text-main">Sleep tracker</h1>
               <p className="text-xs text-text-muted mt-0.5">Add and review sleep hours</p>
             </div>
-            <button
-              type="button"
-              onClick={() => setPanelWithTransition(null, 'backward')}
-              className="text-xs font-medium text-text-muted hover:text-text-main"
-            >
-              Back
-            </button>
+            <div className="h-9 w-9" />
           </div>
         </header>
 

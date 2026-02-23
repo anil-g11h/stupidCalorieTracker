@@ -592,7 +592,7 @@ export default function AddLogEntry() {
       
       if (logId) {
         await db.logs.put(entry);
-        pop(`/log?date=${date}`);
+        pop();
         return;
       }
 
@@ -607,7 +607,7 @@ export default function AddLogEntry() {
         return;
       }
 
-      pop(`/log?date=${date}`);
+      pop();
     } catch (error) {
       console.error('Failed to save log:', error);
       alert('Failed to save log');
@@ -648,13 +648,10 @@ export default function AddLogEntry() {
   return (
     <div className="container mx-auto p-4 max-w-md pb-24">
       <div className="flex items-center mb-4">
-        <button type="button" onClick={() => pop(`/log?date=${date}`)} className="mr-4 text-text-muted hover:text-text-main">
-          &larr; Back
-        </button>
         <h1 className="text-2xl font-bold text-text-main">Add to {mealLabel}</h1>
         {!logId && (
           <button
-            onClick={() => pop(`/log?date=${date}`)}
+            onClick={() => pop()}
             className="ml-auto px-3 py-1.5 rounded-full text-xs font-bold bg-brand text-brand-fg hover:opacity-90 transition-opacity"
           >
             Done{addedCount > 0 ? ` (${addedCount})` : ''}
