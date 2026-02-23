@@ -5,6 +5,7 @@ import { ESSENTIAL_AMINO_ACIDS } from '../../../lib/constants';
 import { generateId } from '../../../lib';
 import { useStackNavigation } from '../../../lib/useStackNavigation';
 import { fetchGeminiNutritionProfile } from '../../../lib/gemini';
+import { supabase } from '../../../lib/supabaseClient';
 
 const ESSENTIAL_VITAMIN_KEYS = [
   'Vitamin A',
@@ -256,6 +257,7 @@ const CreateFood: React.FC = () => {
   const {pop} = useStackNavigation();
   // --- State ---
   const [name, setName] = useState('');
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [brand, setBrand] = useState('');
   const [servingSize, setServingSize] = useState<number>(100);
   const [servingUnit, setServingUnit] = useState('g');
@@ -290,6 +292,20 @@ const CreateFood: React.FC = () => {
   const [isFetching, setIsFetching] = useState(false);
   const hydratedFoodIdRef = useRef<string | null>(null);
   const hasPrefilledNameRef = useRef(false);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setCurrentUserId(session?.user?.id ?? null);
+    });
+
+    const {
+      data: { subscription }
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setCurrentUserId(session?.user?.id ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   useEffect(() => {
     if (isEditMode || hasPrefilledNameRef.current || name.trim().length > 0) return;
@@ -443,9 +459,10 @@ const CreateFood: React.FC = () => {
       setFat(data.fat || 0);
       
       if (data.micros && typeof data.micros === 'object') {
+        const microsData = data.micros as Record<string, unknown>;
         const cleanMicros: Record<string, number> = {};
         REQUIRED_MICRO_KEYS.forEach((microKey) => {
-          cleanMicros[microKey] = getMicroValue(data.micros, microKey);
+          cleanMicros[microKey] = getMicroValue(microsData, microKey);
         });
         setMicros(cleanMicros);
       }
@@ -623,42 +640,46 @@ const CreateFood: React.FC = () => {
 <div className="container mx-auto p-4 max-w-lg bg-page">
       <header className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">{isEditMode ? 'Edit Food' : 'New Food'}</h1>
-        <button 
-          onClick={fetchAiData}
-          disabled={isFetching || !name}
-          className={`flex items-center gap-2 text-xs px-4 py-2 rounded-lg font-bold transition-all ${
-            isFetching ? 'bg-gray-400' : 'bg-brand text-brand-fg hover:opacity-90'
-          }`}
-        >
-          {isFetching ? '⌛ Fetching...' : '✨ Magic Fill'}
-        </button>
+        {currentUserId && (
+          <button 
+            onClick={fetchAiData}
+            disabled={isFetching || !name}
+            className={`flex items-center gap-2 text-xs px-4 py-2 rounded-lg font-bold transition-all ${
+              isFetching ? 'bg-gray-400' : 'bg-brand text-brand-fg hover:opacity-90'
+            }`}
+          >
+            {isFetching ? '⌛ Fetching...' : '✨ Magic Fill'}
+          </button>
+        )}
       </header>
 
       {/* Smart Import Section */}
-      <div className="mb-8 p-4 bg-surface rounded-xl border border-border-subtle">
-        <label className="block text-[10px] font-bold text-text-muted uppercase tracking-widest mb-2">
-          AI Data Importer
-        </label>
-        {!showAiPasteInput ? (
-          <button
-            type="button"
-            onClick={() => {
-              copyAIPrompt();
-              setShowAiPasteInput(true);
-            }}
-            className="w-full p-3 text-sm font-bold border border-border-subtle rounded-lg bg-card text-text-main hover:bg-brand hover:text-brand-fg hover:border-brand transition-colors"
-          >
-            Copy Prompt
-          </button>
-        ) : (
-          <textarea
-            value={aiInput}
-            onChange={handleAiPaste}
-            placeholder="Paste AI response here to auto-fill everything..."
-            className="w-full h-24 p-2 text-sm border border-border-subtle rounded-lg focus:ring-2 focus:ring-brand focus:outline-none bg-card placeholder:text-text-muted"
-          />
-        )}
-      </div>
+      {currentUserId && (
+        <div className="mb-8 p-4 bg-surface rounded-xl border border-border-subtle">
+          <label className="block text-[10px] font-bold text-text-muted uppercase tracking-widest mb-2">
+            AI Data Importer
+          </label>
+          {!showAiPasteInput ? (
+            <button
+              type="button"
+              onClick={() => {
+                copyAIPrompt();
+                setShowAiPasteInput(true);
+              }}
+              className="w-full p-3 text-sm font-bold border border-border-subtle rounded-lg bg-card text-text-main hover:bg-brand hover:text-brand-fg hover:border-brand transition-colors"
+            >
+              Copy Prompt
+            </button>
+          ) : (
+            <textarea
+              value={aiInput}
+              onChange={handleAiPaste}
+              placeholder="Paste AI response here to auto-fill everything..."
+              className="w-full h-24 p-2 text-sm border border-border-subtle rounded-lg focus:ring-2 focus:ring-brand focus:outline-none bg-card placeholder:text-text-muted"
+            />
+          )}
+        </div>
+      )}
 
       <form onSubmit={(e) => e.preventDefault()} className="space-y-6">
         {/* Basic Identification */}

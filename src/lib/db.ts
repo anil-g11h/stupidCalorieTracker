@@ -1,18 +1,33 @@
 // src/lib/db.ts
 import Dexie, { type Table } from 'dexie';
 
+let remoteSyncWriteDepth = 0;
+
+export function isRemoteSyncWriteInProgress(): boolean {
+  return remoteSyncWriteDepth > 0;
+}
+
+export async function withRemoteSyncWrite<T>(operation: () => Promise<T>): Promise<T> {
+  remoteSyncWriteDepth += 1;
+  try {
+    return await operation();
+  } finally {
+    remoteSyncWriteDepth = Math.max(0, remoteSyncWriteDepth - 1);
+  }
+}
+
 export interface Profile {
   id: string; // uuid from supabase auth
-  username?: string;
-  full_name?: string;
-  avatar_url?: string;
+  username?: string | null;
+  full_name?: string | null;
+  avatar_url?: string | null;
   diet_tags?: string[];
   allergies?: string[];
   custom_allergies?: string[];
-  goal_focus?: string;
-  activity_level?: string;
+  goal_focus?: string | null;
+  activity_level?: string | null;
   medical_constraints?: string[];
-  meal_pattern?: string;
+  meal_pattern?: string | null;
   updated_at?: Date;
   synced?: number;
 }
@@ -44,6 +59,7 @@ export interface FoodIngredient {
   child_food_id: string; // The Ingredient
   quantity: number; // Amount of child food used
   created_at?: Date;
+  updated_at?: Date;
   synced?: number;
 }
 
@@ -55,6 +71,7 @@ export interface DailyLog {
   food_id: string;
   amount_consumed: number; // Multiplier of serving size
   created_at?: Date;
+  updated_at?: Date;
   synced?: number;
 }
 
@@ -82,6 +99,7 @@ export interface BodyMetric {
   value: number;
   unit: string; // 'kg', 'cm', 'in', etc.
   created_at?: Date;
+  updated_at?: Date;
   synced?: number;
 }
 
@@ -120,6 +138,12 @@ export interface UserSettings {
     carbPercent: number;
     fatPercent: number;
     fiberGrams: number;
+    proteinTargetGrams?: number;
+    carbsTargetGrams?: number;
+    fatTargetGrams?: number;
+    sleepTarget?: number;
+    waterTarget?: number;
+    weightTarget?: number;
   };
   meals: MealSetting[];
   reminders: {
@@ -157,6 +181,7 @@ export interface ActivityLog {
   duration_minutes: number;
   calories_burned: number;
   created_at?: Date;
+  updated_at?: Date;
   synced?: number;
 }
 
@@ -196,6 +221,7 @@ export interface WorkoutLogEntry {
   sort_order: number;
   notes?: string;
   created_at?: Date;
+  updated_at?: Date;
   synced?: number;
 }
 
@@ -213,6 +239,7 @@ export interface WorkoutSet {
   is_warmup?: boolean;
   completed?: boolean;
   created_at?: Date;
+  updated_at?: Date;
   synced?: number;
 }
 
@@ -233,6 +260,7 @@ export interface WorkoutRoutineEntry {
   sort_order: number;
   notes?: string;
   created_at?: Date;
+  updated_at?: Date;
   synced?: number;
 }
 
@@ -246,6 +274,7 @@ export interface WorkoutRoutineSet {
   distance?: number;
   duration_seconds?: number;
   created_at?: Date;
+  updated_at?: Date;
   synced?: number;
 }
 
@@ -334,7 +363,15 @@ export class MyDatabase extends Dexie {
     tablesToSync.forEach((tableName) => {
       // @ts-ignore
       this.table(tableName).hook('creating', (primKey, obj, transaction) => {
+        if (isRemoteSyncWriteInProgress()) return;
         if (obj.synced === 1) return; // synced from server
+        const nowIso = new Date().toISOString();
+        if (!obj.created_at) {
+          obj.created_at = nowIso;
+        }
+        if (!obj.updated_at) {
+          obj.updated_at = obj.created_at ?? nowIso;
+        }
         obj.synced = 0; 
         
         setTimeout(() => {
@@ -349,8 +386,11 @@ export class MyDatabase extends Dexie {
 
       // @ts-ignore
       this.table(tableName).hook('updating', (mods, primKey, obj, transaction) => {
+        if (isRemoteSyncWriteInProgress()) return;
+        if (tableName === 'workout_exercises_def' && !obj?.user_id) return;
         if ((mods as any).synced === 1) return;
-        const updatedObj = { ...obj, ...mods, synced: 0 };
+        const nowIso = new Date().toISOString();
+        const updatedObj = { ...obj, ...mods, updated_at: nowIso, synced: 0 };
         
         setTimeout(() => {
           this.sync_queue.add({
@@ -361,11 +401,13 @@ export class MyDatabase extends Dexie {
           }).catch(err => console.error(`[DB] Failed to add to sync_queue for ${tableName}:`, err));
         }, 0);
 
-        return { synced: 0 };
+        return { synced: 0, updated_at: nowIso };
       });
 
       // @ts-ignore
       this.table(tableName).hook('deleting', (primKey, obj, transaction) => {
+        if (isRemoteSyncWriteInProgress()) return;
+        if (tableName === 'workout_exercises_def' && !obj?.user_id) return;
         setTimeout(() => {
           this.sync_queue.add({
             table: tableName,

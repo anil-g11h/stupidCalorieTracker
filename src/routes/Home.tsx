@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Link } from 'react-router-dom';
-import { db, type BodyMetric, type Food, type Goal, type UserSettings } from '../lib/db';
+import { db, type BodyMetric, type Food, type UserSettings } from '../lib/db';
 import { generateId } from '../lib';
 import { supabase } from '../lib/supabaseClient';
 
@@ -56,6 +56,8 @@ const WATER_PORTION_OPTIONS = [
   { id: 'medium-mug', label: 'Medium mug', amount: 350, icon: '☕️' },
   { id: 'large-bottle', label: 'Large bottle', amount: 750, icon: '🧴' }
 ];
+
+const DEFAULT_FIRST_WEIGHT_KG = 70;
 
 export default function Home() {
   const now = new Date();
@@ -141,11 +143,10 @@ export default function Home() {
   );
 
   const data = useLiveQuery(async () => {
-    const [todayLogs, settings, workouts, goal] = await Promise.all([
+    const [todayLogs, settings, workouts] = await Promise.all([
       db.logs.where('date').equals(today).toArray(),
       db.settings.get(SETTINGS_ID as string) as Promise<SettingsRow | undefined>,
-      db.workouts.toArray(),
-      db.goals.where('start_date').belowOrEqual(today).reverse().first() as Promise<Goal | undefined>
+      db.workouts.toArray()
     ]);
 
     const foodIds = [...new Set(todayLogs.map((log) => log.food_id))];
@@ -178,7 +179,6 @@ export default function Home() {
 
     return {
       settings,
-      goal,
       todayLogsCount: todayLogs.length,
       calorieTotals,
       workoutsCount: workouts.length,
@@ -186,17 +186,17 @@ export default function Home() {
       thisWeekWorkoutsCount: thisWeekWorkouts.length,
       thisWeekMinutes
     };
-  }, [today, weekStartIso]);
+  }, [today, weekStartIso, currentUserId]);
 
-  const calorieGoal = data?.goal?.calories_target ?? data?.settings?.nutrition?.calorieBudget ?? 2000;
+  const calorieGoal = data?.settings?.nutrition?.calorieBudget ?? 2000;
   const proteinGoal =
-    data?.goal?.protein_target ??
+    data?.settings?.nutrition?.proteinTargetGrams ??
     Math.round((calorieGoal * ((data?.settings?.nutrition?.proteinPercent ?? 30) / 100)) / 4);
   const carbsGoal =
-    data?.goal?.carbs_target ??
+    data?.settings?.nutrition?.carbsTargetGrams ??
     Math.round((calorieGoal * ((data?.settings?.nutrition?.carbPercent ?? 40) / 100)) / 4);
   const fatGoal =
-    data?.goal?.fat_target ??
+    data?.settings?.nutrition?.fatTargetGrams ??
     Math.round((calorieGoal * ((data?.settings?.nutrition?.fatPercent ?? 30) / 100)) / 9);
 
   const caloriesConsumed = Math.round(data?.calorieTotals.calories ?? 0);
@@ -210,8 +210,8 @@ export default function Home() {
   const latestWeightLabel = recentWeight[0] ? `${recentWeight[0].value} ${recentWeight[0].unit}` : 'No entries yet';
   const latestWaterLabel = recentWater[0] ? `${recentWater[0].value} ${recentWater[0].unit}` : 'No entries yet';
   const latestSleepLabel = recentSleep[0] ? `${recentSleep[0].value} ${recentSleep[0].unit}` : 'No entries yet';
-  const waterGoal = Math.max(0, data?.goal?.water_target ?? 0);
-  const sleepGoal = Math.max(0, data?.goal?.sleep_target ?? 0);
+  const waterGoal = Math.max(0, data?.settings?.nutrition?.waterTarget ?? 0);
+  const sleepGoal = Math.max(0, data?.settings?.nutrition?.sleepTarget ?? 0);
   const todayWater = recentWater.filter((entry) => entry.date === today).reduce((sum, entry) => sum + (entry.value || 0), 0);
   const todaySleep = recentSleep.filter((entry) => entry.date === today).reduce((sum, entry) => sum + (entry.value || 0), 0);
   const hasWeightToday = recentWeight.some((entry) => entry.date === today);
@@ -226,7 +226,7 @@ export default function Home() {
   );
   const previousWeightEntry = recentWeight[0];
   const previousWeightKg = previousWeightEntry ? toKg(previousWeightEntry.value, previousWeightEntry.unit) : null;
-  const goalWeightKg = (data?.goal?.weight_target ?? 0) > 0 ? (data?.goal?.weight_target as number) : null;
+  const goalWeightKg = (data?.settings?.nutrition?.weightTarget ?? 0) > 0 ? (data?.settings?.nutrition?.weightTarget as number) : null;
   const oldestWeightEntry = recentWeight[recentWeight.length - 1];
   const startWeightKg = oldestWeightEntry ? toKg(oldestWeightEntry.value, oldestWeightEntry.unit) : null;
   const distanceToGoalKg =
@@ -295,29 +295,11 @@ export default function Home() {
       deltaKg
     };
   }, [recentWeight, goalWeightKg]);
-  const sliderMinKg = Math.max(
-    20,
-    Math.floor(
-      Math.min(
-        previousWeightKg ?? Number.POSITIVE_INFINITY,
-        goalWeightKg ?? Number.POSITIVE_INFINITY,
-        previousWeightKg !== null ? previousWeightKg - 5 : Number.POSITIVE_INFINITY,
-        goalWeightKg !== null ? goalWeightKg - 5 : Number.POSITIVE_INFINITY
-      )
-    )
-  );
-  const sliderMaxKg = Math.min(
-    300,
-    Math.ceil(
-      Math.max(
-        previousWeightKg ?? Number.NEGATIVE_INFINITY,
-        goalWeightKg ?? Number.NEGATIVE_INFINITY,
-        previousWeightKg !== null ? previousWeightKg + 5 : Number.NEGATIVE_INFINITY,
-        goalWeightKg !== null ? goalWeightKg + 5 : Number.NEGATIVE_INFINITY,
-        100
-      )
-    )
-  );
+  const sliderAnchorsKg = [previousWeightKg, goalWeightKg].filter((value): value is number => value !== null);
+  const sliderSeedWeightsKg = sliderAnchorsKg.length > 0 ? sliderAnchorsKg : [DEFAULT_FIRST_WEIGHT_KG];
+  const sliderMinKg = Math.max(20, Math.floor(Math.min(...sliderSeedWeightsKg.map((value) => value - 5))));
+  const sliderMaxKg = Math.min(300, Math.ceil(Math.max(...sliderSeedWeightsKg.map((value) => value + 5), 100)));
+  const sliderValueKg = weightSliderKg ?? previousWeightKg ?? goalWeightKg ?? DEFAULT_FIRST_WEIGHT_KG;
   const goalMarkerPercent =
     goalWeightKg !== null && sliderMaxKg > sliderMinKg
       ? Math.min(100, Math.max(0, ((goalWeightKg - sliderMinKg) / (sliderMaxKg - sliderMinKg)) * 100))
@@ -332,7 +314,7 @@ export default function Home() {
       setWeightSliderKg(Math.round(goalWeightKg * 10) / 10);
       return;
     }
-    setWeightSliderKg(null);
+    setWeightSliderKg(DEFAULT_FIRST_WEIGHT_KG);
   }, [previousWeightKg, goalWeightKg]);
 
   useEffect(() => {
@@ -432,30 +414,33 @@ export default function Home() {
     }
 
     try {
-      const existingTodayGoal = await db.goals
-        .where('start_date')
-        .equals(today)
-        .and((goal) => goal.user_id === currentUserId)
-        .first();
-
-      const nextGoal: Goal = {
-        id: existingTodayGoal?.id ?? generateId(),
+      const existingSettings = (await db.settings.get(SETTINGS_ID as string)) as SettingsRow | undefined;
+      const settingsToSave: SettingsRow = {
+        ...(existingSettings ?? ({ id: SETTINGS_ID, nutrition: {}, meals: [], reminders: {}, updated_at: '' } as any)),
+        id: SETTINGS_ID,
         user_id: currentUserId,
-        start_date: today,
-        calories_target: existingTodayGoal?.calories_target ?? calorieGoal,
-        protein_target: existingTodayGoal?.protein_target ?? proteinGoal,
-        carbs_target: existingTodayGoal?.carbs_target ?? carbsGoal,
-        fat_target: existingTodayGoal?.fat_target ?? fatGoal,
-        sleep_target: existingTodayGoal?.sleep_target ?? data?.goal?.sleep_target,
-        water_target: existingTodayGoal?.water_target ?? data?.goal?.water_target,
-        weight_target: Math.round(value * 10) / 10,
-        synced: 0,
-        created_at: existingTodayGoal?.created_at ?? new Date(),
-        updated_at: new Date()
+        nutrition: {
+          ...(existingSettings?.nutrition ?? {}),
+          calorieBudget: existingSettings?.nutrition?.calorieBudget ?? calorieGoal,
+          proteinPercent: existingSettings?.nutrition?.proteinPercent ?? 30,
+          carbPercent: existingSettings?.nutrition?.carbPercent ?? 40,
+          fatPercent: existingSettings?.nutrition?.fatPercent ?? 30,
+          fiberGrams: existingSettings?.nutrition?.fiberGrams ?? 30,
+          proteinTargetGrams: existingSettings?.nutrition?.proteinTargetGrams ?? proteinGoal,
+          carbsTargetGrams: existingSettings?.nutrition?.carbsTargetGrams ?? carbsGoal,
+          fatTargetGrams: existingSettings?.nutrition?.fatTargetGrams ?? fatGoal,
+          sleepTarget: existingSettings?.nutrition?.sleepTarget ?? sleepGoal,
+          waterTarget: existingSettings?.nutrition?.waterTarget ?? waterGoal,
+          weightTarget: Math.round(value * 10) / 10
+        },
+        meals: existingSettings?.meals ?? [],
+        reminders: existingSettings?.reminders ?? ({ food: { enabled: true, time: '08:00' }, water: { enabled: true, time: '10:00' }, workout: { enabled: false, time: '18:00' }, walk: { enabled: false, time: '17:00' }, weight: { enabled: false, time: '07:00' }, medicine: { enabled: false, time: '09:00' } } as any),
+        updated_at: new Date().toISOString(),
+        synced: 0
       };
 
-      await db.goals.put(nextGoal);
-      setWeightGoalFeedback(`Goal saved: ${nextGoal.weight_target} kg`);
+      await db.settings.put(settingsToSave);
+      setWeightGoalFeedback(`Goal saved: ${settingsToSave.nutrition.weightTarget} kg`);
       setTimeout(() => setWeightGoalFeedback(''), 1600);
       return true;
     } catch (error) {
@@ -666,15 +651,18 @@ export default function Home() {
                 <p className="text-xs font-bold uppercase tracking-wide text-text-muted">Quick from previous</p>
                 {weightQuickAddFeedback ? <p className="text-xs font-semibold text-brand">{weightQuickAddFeedback}</p> : null}
               </div>
-              {previousWeightEntry ? (
+              {
                 <>
                   <p className="text-sm text-text-main mt-1">
-                    Previous: <span className="font-bold">{previousWeightEntry.value} {previousWeightEntry.unit}</span>
+                    Previous:{' '}
+                    <span className="font-bold">
+                      {previousWeightEntry ? `${previousWeightEntry.value} ${previousWeightEntry.unit}` : '—'}
+                    </span>
                   </p>
                   <div className="mt-2">
                     <div className="flex items-center justify-between gap-2 text-xs text-text-muted mb-1">
                       <span>{sliderMinKg} kg</span>
-                      <span className="font-semibold text-text-main">{(weightSliderKg ?? previousWeightKg).toFixed(1)} kg</span>
+                      <span className="font-semibold text-text-main">{sliderValueKg.toFixed(1)} kg</span>
                       <span>{sliderMaxKg} kg</span>
                     </div>
                     <div className="relative">
@@ -683,7 +671,7 @@ export default function Home() {
                         min={sliderMinKg}
                         max={sliderMaxKg}
                         step={0.5}
-                        value={weightSliderKg ?? previousWeightKg}
+                        value={sliderValueKg}
                         onChange={(event) => setWeightSliderKg(Number(event.target.value))}
                         className="w-full accent-brand"
                       />
@@ -708,17 +696,19 @@ export default function Home() {
                       </button>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => void addSameAsPreviousWeight()}
-                    className="mt-2 w-full rounded-lg border border-border-subtle bg-card px-3 py-2 text-sm font-semibold text-text-main hover:border-brand-light"
-                  >
-                    Same as previous
-                  </button>
+                  {previousWeightEntry ? (
+                    <button
+                      type="button"
+                      onClick={() => void addSameAsPreviousWeight()}
+                      className="mt-2 w-full rounded-lg border border-border-subtle bg-card px-3 py-2 text-sm font-semibold text-text-main hover:border-brand-light"
+                    >
+                      Same as previous
+                    </button>
+                  ) : (
+                    <p className="text-[11px] text-text-muted mt-2">Use the slider and tap Save slider to add your first entry.</p>
+                  )}
                 </>
-              ) : (
-                <p className="text-xs text-text-muted mt-1">Add your first weight entry to enable quick slider tracking.</p>
-              )}
+              }
             </div>
 
             <div className="rounded-xl border border-border-subtle bg-surface px-3 py-2.5">

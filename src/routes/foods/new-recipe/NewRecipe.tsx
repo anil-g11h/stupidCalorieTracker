@@ -193,9 +193,9 @@ const resolveSpoonacularDietFromTags = (dietTags: string[] | undefined): string 
   return SPOONACULAR_DIET_BY_TAG[matched];
 };
 
-const resolveProteinTarget = (settingsRow: unknown, goalRow: unknown): number => {
-  const goalProtein = Number((goalRow as any)?.protein_target);
-  if (Number.isFinite(goalProtein) && goalProtein > 0) return goalProtein;
+const resolveProteinTarget = (settingsRow: unknown): number => {
+  const targetProtein = Number((settingsRow as any)?.nutrition?.proteinTargetGrams);
+  if (Number.isFinite(targetProtein) && targetProtein > 0) return targetProtein;
 
   const calorieBudget = Number((settingsRow as any)?.nutrition?.calorieBudget);
   const proteinPercent = Number((settingsRow as any)?.nutrition?.proteinPercent);
@@ -379,7 +379,6 @@ export default function CreateRecipe() {
   [selectedIngredients]);
 
   const settingsRow = useLiveQuery(async () => db.settings.get('local-settings'), []);
-  const goalRow = useLiveQuery(async () => db.goals.where('start_date').belowOrEqual(today).reverse().first(), [today]);
   const profileRow = useLiveQuery(
     async () => {
       if (!currentUserId) return undefined;
@@ -404,20 +403,20 @@ export default function CreateRecipe() {
   }, []);
 
   const mealPlanTargetCalories = useMemo(() => {
-    const goalCalories = Number(goalRow?.calories_target);
-    if (Number.isFinite(goalCalories) && goalCalories > 0) return Math.round(goalCalories);
+    const targetCalories = Number((settingsRow as any)?.nutrition?.calorieBudget);
+    if (Number.isFinite(targetCalories) && targetCalories > 0) return Math.round(targetCalories);
 
     const settingsCalories = Number((settingsRow as any)?.nutrition?.calorieBudget);
     if (Number.isFinite(settingsCalories) && settingsCalories > 0) return Math.round(settingsCalories);
 
     return 2000;
-  }, [goalRow, settingsRow]);
+  }, [settingsRow]);
 
   const mealPlanDiet = useMemo(() => {
     const profileDiet = resolveSpoonacularDietFromTags(profileRow?.diet_tags);
     return profileDiet;
   }, [profileRow]);
-  const dailyProteinTarget = useMemo(() => resolveProteinTarget(settingsRow, goalRow), [settingsRow, goalRow]);
+  const dailyProteinTarget = useMemo(() => resolveProteinTarget(settingsRow), [settingsRow]);
   const eaaTargetRatio = useMemo(() => resolveEaaTargetRatio(settingsRow), [settingsRow]);
   const goalFocus = useMemo(() => String((profileRow as any)?.goal_focus || '').trim(), [profileRow]);
   const prioritizeEaa = useMemo(() => eaaTargetRatio > 0, [eaaTargetRatio]);
@@ -1037,18 +1036,20 @@ export default function CreateRecipe() {
         )}
       </div>
 
-      <button
-        type="button"
-        onClick={fetchRecipeIngredients}
-        disabled={isFetchingAiRecipe || !recipeName.trim()}
-        className={`mb-4 w-full py-2 rounded font-semibold transition-colors ${
-          isFetchingAiRecipe || !recipeName.trim()
-            ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
-            : 'bg-brand text-brand-fg hover:opacity-90'
-        }`}
-      >
-        {isFetchingAiRecipe ? 'Fetching Recipe…' : '✨ Fetch Ingredients from Gemini'}
-      </button>
+      {currentUserId && (
+        <button
+          type="button"
+          onClick={fetchRecipeIngredients}
+          disabled={isFetchingAiRecipe || !recipeName.trim()}
+          className={`mb-4 w-full py-2 rounded font-semibold transition-colors ${
+            isFetchingAiRecipe || !recipeName.trim()
+              ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
+              : 'bg-brand text-brand-fg hover:opacity-90'
+          }`}
+        >
+          {isFetchingAiRecipe ? 'Fetching Recipe…' : '✨ Fetch Ingredients from Gemini'}
+        </button>
+      )}
       
       <form onSubmit={saveRecipe} className="space-y-4">
         <div>

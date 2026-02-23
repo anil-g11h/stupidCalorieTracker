@@ -469,21 +469,27 @@ export default function DailyLogPage() {
     const daysLogs = await db.logs.where('date').equals(date).toArray();
     const foodIds = [...new Set(daysLogs.map((log) => log.food_id))];
     const foods = foodIds.length ? await db.foods.where('id').anyOf(foodIds).toArray() : [];
-    const goal = await db.goals.where('start_date').belowOrEqual(date).reverse().first();
+    const settingsRow = await db.settings.get(SETTINGS_ID);
 
     const foodsMap = foods.reduce<Record<string, Food>>((acc, food) => {
       acc[food.id] = food;
       return acc;
     }, {});
 
-    return { daysLogs, foodsMap, goal };
+    return { daysLogs, foodsMap, settingsRow };
   }, [date]);
 
   const baseGoals = {
-    calories: data?.goal?.calories_target ?? 2000,
-    protein: data?.goal?.protein_target ?? 150,
-    carbs: data?.goal?.carbs_target ?? 200,
-    fat: data?.goal?.fat_target ?? 65
+    calories: Number((data as any)?.settingsRow?.nutrition?.calorieBudget) || 2000,
+    protein:
+      Number((data as any)?.settingsRow?.nutrition?.proteinTargetGrams) ||
+      Math.round(((Number((data as any)?.settingsRow?.nutrition?.calorieBudget) || 2000) * ((Number((data as any)?.settingsRow?.nutrition?.proteinPercent) || 30) / 100)) / 4),
+    carbs:
+      Number((data as any)?.settingsRow?.nutrition?.carbsTargetGrams) ||
+      Math.round(((Number((data as any)?.settingsRow?.nutrition?.calorieBudget) || 2000) * ((Number((data as any)?.settingsRow?.nutrition?.carbPercent) || 40) / 100)) / 4),
+    fat:
+      Number((data as any)?.settingsRow?.nutrition?.fatTargetGrams) ||
+      Math.round(((Number((data as any)?.settingsRow?.nutrition?.calorieBudget) || 2000) * ((Number((data as any)?.settingsRow?.nutrition?.fatPercent) || 30) / 100)) / 9)
   };
 
   const goals = useMemo(

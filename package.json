@@ -19,7 +19,8 @@
 		"deploy:strict": "bash ./deploy.sh --skip-install --require-migrations",
 		"db:backup": "bash ./scripts/db/backup.sh",
 		"db:restore": "bash ./scripts/db/restore.sh",
-		"seed:workouts:sql": "node scripts/db/generate-workout-seed-sql.mjs --mode=wipe --out=supabase/seeds/workouts/seed_workout_exercises.wipe.sql",
+		"seed:workouts:sql": "node scripts/db/generate-workout-seed-sql.mjs --mode=upsert --out=supabase/seeds/workouts/seed_workout_exercises.upsert.sql",
+		"seed:workouts:sql:wipe": "node scripts/db/generate-workout-seed-sql.mjs --mode=wipe --out=supabase/seeds/workouts/seed_workout_exercises.wipe.sql",
 		"seed:workouts:sql:upsert": "node scripts/db/generate-workout-seed-sql.mjs --mode=upsert --out=supabase/seeds/workouts/seed_workout_exercises.upsert.sql"
 	},
 	"devDependencies": {

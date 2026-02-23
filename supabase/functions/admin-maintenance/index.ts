@@ -1,6 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-type GlobalAdminAction = 'cleanup_duplicate_public_workout_exercises' | 'cleanup_orphan_food_ingredients';
+type GlobalAdminAction =
+  | 'cleanup_duplicate_public_workout_exercises'
+  | 'cleanup_orphan_food_ingredients';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -33,7 +35,10 @@ function parseAdminEmails(raw: string | undefined): string[] {
 }
 
 function isValidAction(value: unknown): value is GlobalAdminAction {
-  return value === 'cleanup_duplicate_public_workout_exercises' || value === 'cleanup_orphan_food_ingredients';
+  return (
+    value === 'cleanup_duplicate_public_workout_exercises' ||
+    value === 'cleanup_orphan_food_ingredients'
+  );
 }
 
 Deno.serve(async (req) => {
@@ -44,6 +49,8 @@ Deno.serve(async (req) => {
   if (req.method !== 'POST') {
     return json(405, { ok: false, message: 'Method not allowed' });
   }
+
+  return json(410, { ok: false, message: 'Admin maintenance endpoint is disabled.' });
 
   try {
     const supabaseUrl = getEnv('SUPABASE_URL');
@@ -57,21 +64,18 @@ Deno.serve(async (req) => {
       return json(401, { ok: false, message: 'Missing bearer token' });
     }
 
-    const authClient = createClient(supabaseUrl, supabaseAnonKey, {
-      global: {
-        headers: {
-          Authorization: `Bearer ${jwt}`
-        }
-      }
-    });
+    const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey);
 
     const {
       data: { user },
       error: userError
-    } = await authClient.auth.getUser();
+    } = await adminClient.auth.getUser(jwt);
 
     if (userError || !user) {
-      return json(401, { ok: false, message: 'Invalid auth session' });
+      return json(401, {
+        ok: false,
+        message: `Invalid auth session${userError?.message ? `: ${userError.message}` : ''}`
+      });
     }
 
     const allowedAdminEmails = parseAdminEmails(Deno.env.get('ADMIN_EMAILS'));
@@ -91,8 +95,6 @@ Deno.serve(async (req) => {
     if (!isValidAction(action)) {
       return json(400, { ok: false, message: 'Invalid action' });
     }
-
-    const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey);
 
     if (action === 'cleanup_duplicate_public_workout_exercises') {
       const { data: exercises, error: exercisesError } = await adminClient

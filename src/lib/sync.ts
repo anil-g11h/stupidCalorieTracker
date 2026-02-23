@@ -1,4 +1,4 @@
-import { db, type SyncQueue } from './db';
+import { db, type SyncQueue, withRemoteSyncWrite } from './db';
 import { supabase } from './supabaseClient';
 import Dexie from 'dexie';
 
@@ -12,11 +12,13 @@ interface SyncTableConfig {
     fallbackDateField?: string;
     public?: boolean;
     select?: string;
+    reconcileDeletes?: boolean;
 }
 
 export class SyncManager {
   private syncInterval: ReturnType<typeof setInterval> | null = null;
   private isSyncing = false;
+    private skippedSharedWorkoutExerciseUpdates = 0;
 
     async getQueueSummary() {
         const queue = await db.sync_queue.toArray();
@@ -64,6 +66,11 @@ export class SyncManager {
         return normalized === '' || normalized === 'null' || normalized === 'undefined';
     }
 
+    private isUuid(value: unknown): value is string {
+        if (typeof value !== 'string') return false;
+        return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+    }
+
     private async fetchRemoteIds(config: SyncTableConfig): Promise<Set<string> | null> {
         const PAGE_SIZE = 500;
         const remoteIds = new Set<string>();
@@ -101,6 +108,94 @@ export class SyncManager {
         return remoteIds;
     }
 
+    private async fetchRemoteDailyLogIdsForUser(userId: string): Promise<Set<string> | null> {
+        const PAGE_SIZE = 500;
+        const remoteIds = new Set<string>();
+        let page = 0;
+
+        while (true) {
+            const from = page * PAGE_SIZE;
+            const to = from + PAGE_SIZE - 1;
+            const { data, error } = await supabase
+                .from('daily_logs')
+                .select('id')
+                .eq('user_id', userId)
+                .order('id', { ascending: true })
+                .range(from, to);
+
+            if (error) {
+                if (this.isMissingRelationError(error)) {
+                    console.warn(`[SyncManager] Skipping daily_logs reconcile for missing table: ${error.message}`);
+                    return null;
+                }
+                throw error;
+            }
+
+            const rows = data ?? [];
+            for (const row of rows) {
+                const id = row?.id;
+                if (typeof id === 'string' && id) {
+                    remoteIds.add(id);
+                }
+            }
+
+            if (rows.length < PAGE_SIZE) break;
+            page += 1;
+        }
+
+        return remoteIds;
+    }
+
+    private async reconcileDailyLogDeletes(session: any) {
+        const userId = session?.user?.id;
+        if (!userId) return;
+
+        try {
+            const remoteIds = await this.fetchRemoteDailyLogIdsForUser(userId);
+            if (!remoteIds) return;
+
+            const localSyncedLogs = await db.logs
+                .where('synced')
+                .equals(1)
+                .and((row: any) => row?.user_id === userId)
+                .toArray();
+
+            if (localSyncedLogs.length === 0) return;
+
+            if (remoteIds.size === 0) {
+                const { count, error } = await supabase
+                    .from('daily_logs')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('user_id', userId);
+
+                if (error) {
+                    console.warn('[SyncManager] Skipping daily_logs reconcile count check:', error);
+                    return;
+                }
+
+                if ((count ?? 0) > 0) {
+                    console.warn(
+                        `[SyncManager] Skipping daily_logs reconcile: id fetch returned empty but count=${count}`
+                    );
+                    return;
+                }
+            }
+
+            const idsToDelete = localSyncedLogs
+                .map((row: any) => row.id)
+                .filter((id: string) => !remoteIds.has(id));
+
+            if (idsToDelete.length > 0) {
+                await withRemoteSyncWrite(async () => {
+                    await db.logs.bulkDelete(idsToDelete);
+                });
+                console.log(`[SyncManager] Removed ${idsToDelete.length} stale local log rows missing in remote daily_logs`);
+            }
+        } catch (error) {
+            console.warn('[SyncManager] daily_logs reconcile skipped:', error);
+        }
+    }
+
     private async getLocalSyncedPrimaryKeys(tableName: string): Promise<Array<string | number>> {
         const table = db.table(tableName);
         const hasSyncedIndex = ((table as any)?.schema?.indexes ?? []).some((index: any) => index?.name === 'synced');
@@ -117,6 +212,10 @@ export class SyncManager {
 
     private async reconcileDeletedRows(tables: SyncTableConfig[], session: any) {
         for (const config of tables) {
+            if (!config.reconcileDeletes) {
+                continue;
+            }
+
             if (!session?.user && !config.public) {
                 continue;
             }
@@ -128,13 +227,23 @@ export class SyncManager {
                 if (config.dexie === 'settings') {
                     const localSettings = await db.settings.get('local-settings');
                     if (localSettings?.synced === 1 && remoteIds.size === 0) {
-                        await db.settings.delete('local-settings');
+                        await withRemoteSyncWrite(async () => {
+                            await db.settings.delete('local-settings');
+                        });
                         console.log('[SyncManager] Removed local settings deleted remotely');
                     }
                     continue;
                 }
 
                 const localSyncedIds = await this.getLocalSyncedPrimaryKeys(config.dexie);
+
+                if (remoteIds.size === 0 && localSyncedIds.length > 0) {
+                    console.warn(
+                        `[SyncManager] Skipping delete reconciliation for ${config.dexie}: remote returned 0 ids while local has ${localSyncedIds.length} synced rows`
+                    );
+                    continue;
+                }
+
                 const idsToDelete = localSyncedIds.filter((id) => !remoteIds.has(String(id)));
 
                 if (idsToDelete.length > 0) {
@@ -313,6 +422,7 @@ export class SyncManager {
         console.log(`[SyncManager] Pushing ${sortedQueue.length} changes for user ${session.user.id}...`);
 
         let failedCount = 0;
+        this.skippedSharedWorkoutExerciseUpdates = 0;
 
         for (const item of sortedQueue) {
       try {
@@ -333,6 +443,12 @@ export class SyncManager {
                 failedCount += 1;
       }
     }
+
+        if (this.skippedSharedWorkoutExerciseUpdates > 0) {
+            console.log(
+                `[SyncManager] Skipped ${this.skippedSharedWorkoutExerciseUpdates} shared workout exercise update(s) (RLS-protected)`
+            );
+        }
 
         if (failedCount > 0) {
             console.warn(`[SyncManager] ${failedCount} queue item(s) failed and were kept for retry`);
@@ -461,8 +577,62 @@ export class SyncManager {
             return false;
         }
 
-        await db.foods.put({ ...data, synced: 1 });
+        await withRemoteSyncWrite(async () => {
+            await db.foods.put({ ...data, synced: 1 });
+        });
         console.log('[SyncManager] Skipping update for non-owned/public food (RLS-protected)', foodId);
+        return true;
+    }
+
+    private async shouldSkipStaleRemoteUpdate(table: string, supabaseTable: string, payload: Record<string, any>): Promise<boolean> {
+        const id = payload?.id;
+        if (!id) return false;
+        const localUpdatedAt = payload?.updated_at;
+
+        const { data, error } = await supabase
+            .from(supabaseTable)
+            .select('*')
+            .eq('id', id)
+            .maybeSingle();
+
+        if (error) {
+            if (this.isMissingRelationError(error)) return false;
+            console.warn(`[SyncManager] Could not compare remote freshness for ${supabaseTable}.${id}:`, error);
+            return false;
+        }
+
+        if (!data) {
+            const localId = table === 'settings' ? 'local-settings' : id;
+            await withRemoteSyncWrite(async () => {
+                await db.table(table).delete(localId as any);
+            });
+            console.warn(`[SyncManager] Removed local ${table}.${String(localId)} because remote ${supabaseTable}.${String(id)} no longer exists`);
+            return true;
+        }
+
+        if (!localUpdatedAt) return false;
+
+        const localTs = new Date(localUpdatedAt).getTime();
+        if (!Number.isFinite(localTs)) return false;
+
+        if (!data.updated_at) return false;
+
+        const remoteTs = new Date(data.updated_at).getTime();
+        if (!Number.isFinite(remoteTs)) return false;
+
+        if (remoteTs <= localTs) return false;
+
+        const normalizedRow = { ...data, synced: 1 };
+        if (table === 'settings') {
+            normalizedRow.id = 'local-settings';
+        }
+
+        await withRemoteSyncWrite(async () => {
+            await db.table(table).put(normalizedRow as any);
+        });
+        console.warn(
+            `[SyncManager] Skipping stale local update for ${supabaseTable}.${id}; remote updated_at is newer`
+        );
         return true;
     }
 
@@ -506,11 +676,24 @@ export class SyncManager {
     // For delete, we only need the ID
     if (action === 'delete') {
          // handle both string ID or object with ID
-         const id = (typeof data === 'object' && data !== null) ? data.id : data;
-         
+         const rawId = (typeof data === 'object' && data !== null) ? data.id : data;
+         let id = rawId;
+
+         if (table === 'settings') {
+             const sessionUserId = session?.user?.id;
+             if (rawId === 'local-settings' || !this.isUuid(rawId)) {
+                 id = sessionUserId;
+             }
+         }
+
          if (!id) {
              console.warn('No ID for delete, skipping', item);
              return; 
+         }
+
+         if (table === 'settings' && !this.isUuid(id)) {
+             console.warn('[SyncManager] Invalid user_settings delete id, skipping', { rawId, resolvedId: id });
+             return;
          }
          
          const { error } = await supabase.from(supabaseTable).delete().eq('id', id);
@@ -530,7 +713,7 @@ export class SyncManager {
             const localExercise = await db.workout_exercises_def.get(payload.id);
             const isSharedExercise = !localExercise?.user_id;
             if (isSharedExercise) {
-                console.log('[SyncManager] Skipping update for shared workout exercise (RLS-protected)', payload.id);
+                this.skippedSharedWorkoutExerciseUpdates += 1;
                 try {
                     await db.workout_exercises_def.update(payload.id, { synced: 1 });
                 } catch (markError) {
@@ -687,6 +870,12 @@ export class SyncManager {
         }
     } else if (action === 'update') {
         if (!payload.id) throw new Error('No ID for update');
+
+        const staleLocalUpdate = await this.shouldSkipStaleRemoteUpdate(table, supabaseTable, payload);
+        if (staleLocalUpdate) {
+            return;
+        }
+
                 const error = await executeUpdate();
         if (table === 'foods' && error?.code === '42501') {
             const handled = await this.resolveForbiddenFoodUpdate(payload.id, session?.user?.id ?? null);
@@ -734,21 +923,21 @@ export class SyncManager {
     const tables: SyncTableConfig[] = [
         { dexie: 'profiles', supabase: 'profiles', dateField: 'updated_at' },
         { dexie: 'foods', supabase: 'foods', dateField: 'updated_at', public: true },
-        { dexie: 'food_ingredients', supabase: 'food_ingredients', dateField: 'created_at', public: true },
-        { dexie: 'logs', supabase: 'daily_logs', dateField: 'created_at' },
+        { dexie: 'food_ingredients', supabase: 'food_ingredients', dateField: 'updated_at', fallbackDateField: 'created_at', public: true },
+        { dexie: 'logs', supabase: 'daily_logs', dateField: 'updated_at', fallbackDateField: 'created_at' },
         { dexie: 'goals', supabase: 'goals', dateField: 'updated_at', fallbackDateField: 'created_at' },
-        { dexie: 'metrics', supabase: 'body_metrics', dateField: 'created_at' },
-        { dexie: 'settings', supabase: 'user_settings', dateField: 'updated_at' },
+        { dexie: 'metrics', supabase: 'body_metrics', dateField: 'updated_at', fallbackDateField: 'created_at' },
+        { dexie: 'settings', supabase: 'user_settings', dateField: 'updated_at', reconcileDeletes: true },
         { dexie: 'activities', supabase: 'activities', dateField: 'updated_at', public: true },
-        { dexie: 'activity_logs', supabase: 'activity_logs', dateField: 'created_at' },
+        { dexie: 'activity_logs', supabase: 'activity_logs', dateField: 'updated_at', fallbackDateField: 'created_at' },
         { dexie: 'workout_exercises_def', supabase: 'workout_exercises_def', dateField: 'updated_at', public: true },
         { dexie: 'workout_rest_preferences', supabase: 'workout_rest_preferences', dateField: 'updated_at' },
         { dexie: 'workout_routines', supabase: 'workout_routines', dateField: 'updated_at' },
-        { dexie: 'workout_routine_entries', supabase: 'workout_routine_entries', dateField: 'created_at' },
-        { dexie: 'workout_routine_sets', supabase: 'workout_routine_sets', dateField: 'created_at' },
+        { dexie: 'workout_routine_entries', supabase: 'workout_routine_entries', dateField: 'updated_at', fallbackDateField: 'created_at' },
+        { dexie: 'workout_routine_sets', supabase: 'workout_routine_sets', dateField: 'updated_at', fallbackDateField: 'created_at' },
         { dexie: 'workouts', supabase: 'workouts', dateField: 'updated_at' },
-        { dexie: 'workout_log_entries', supabase: 'workout_log_entries', dateField: 'created_at' },
-        { dexie: 'workout_sets', supabase: 'workout_sets', dateField: 'created_at' }
+        { dexie: 'workout_log_entries', supabase: 'workout_log_entries', dateField: 'updated_at', fallbackDateField: 'created_at' },
+        { dexie: 'workout_sets', supabase: 'workout_sets', dateField: 'updated_at', fallbackDateField: 'created_at' }
     ];
     
     // Batch size to prevent large payloads
@@ -849,7 +1038,9 @@ export class SyncManager {
                     }
                     return normalizedRow;
                 });
-                await db.table(config.dexie).bulkPut(rows);
+                await withRemoteSyncWrite(async () => {
+                    await db.table(config.dexie).bulkPut(rows);
+                });
                 hasChanges = true;
 
                 // Track max timestamp from the data we just received
@@ -877,17 +1068,15 @@ export class SyncManager {
         return;
     }
 
-    await this.reconcileDeletedRows(tables, session);
+    // Delete reconciliation disabled globally to avoid accidental local data loss when
+    // remote snapshots are incomplete or temporarily inconsistent.
+    // Keep a narrow, user-scoped reconcile for daily logs to remove stale local-only rows.
+    // Daily log delete reconciliation is intentionally disabled to avoid
+    // accidental local removals from transient remote/list inconsistencies.
+    // Users can manually clear stale local rows when needed.
 
     if (hasChanges && maxTimestamp > lastSyncedDate) {
         localStorage.setItem(lastSyncedKey, maxTimestamp); 
-    } else if (!hasChanges) {
-        // If no changes at all, we can update to now() only if we are sure we checked everything
-        // But safely, let's just keep lastSyncedDate. 
-        // Or update to now() to avoid checking old range repeatedly?
-        // If we queried with gt(lastSyncedDate) and got 0 results, 
-        // it means state IS synced up to now().
-        localStorage.setItem(lastSyncedKey, new Date().toISOString());
     }
   }
 }

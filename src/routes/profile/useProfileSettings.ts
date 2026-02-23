@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, type Goal, type Profile } from '../../lib/db';
+import { db, type Profile } from '../../lib/db';
 import { generateId } from '../../lib';
 import {
   buildProfilePatchFromPreferences,
@@ -21,7 +21,7 @@ import { supabase } from '../../lib/supabaseClient';
 import { syncManager } from '../../lib/sync';
 
 export type ReminderKey = 'food' | 'water' | 'workout' | 'walk' | 'weight' | 'medicine';
-export type OpenProfileSection = 'nutrition' | 'dietary' | 'meals' | 'reminders' | 'admin' | null;
+export type OpenProfileSection = 'nutrition' | 'dietary' | 'meals' | 'reminders' | null;
 
 interface ReminderSetting {
   enabled: boolean;
@@ -37,6 +37,12 @@ interface LocalSettingsRow {
     carbPercent: number;
     fatPercent: number;
     fiberGrams: number;
+    proteinTargetGrams?: number;
+    carbsTargetGrams?: number;
+    fatTargetGrams?: number;
+    sleepTarget?: number;
+    waterTarget?: number;
+    weightTarget?: number;
   };
   meals: MealSetting[];
   reminders: Record<ReminderKey, ReminderSetting>;
@@ -46,8 +52,6 @@ interface LocalSettingsRow {
 const SETTINGS_STORAGE_KEY = 'stupid_tracker_settings_v1';
 const SETTINGS_ID: LocalSettingsRow['id'] = 'local-settings';
 export const REMINDER_KEYS: ReminderKey[] = ['food', 'water', 'workout', 'walk', 'weight', 'medicine'];
-const TODAY = () => new Date().toISOString().split('T')[0];
-
 const createDefaultSettings = (): LocalSettingsRow => ({
   id: SETTINGS_ID,
   nutrition: {
@@ -55,7 +59,13 @@ const createDefaultSettings = (): LocalSettingsRow => ({
     proteinPercent: 30,
     carbPercent: 40,
     fatPercent: 30,
-    fiberGrams: 30
+    fiberGrams: 30,
+    proteinTargetGrams: 150,
+    carbsTargetGrams: 200,
+    fatTargetGrams: 65,
+    sleepTarget: 8,
+    waterTarget: 2000,
+    weightTarget: 0
   },
   meals: [
     { id: generateId(), name: 'Breakfast', time: '08:00', targetMode: 'percent', targetValue: 25 },
@@ -111,7 +121,13 @@ const normalizeSettings = (input: Partial<LocalSettingsRow> | null | undefined):
       proteinPercent: toNonNegativeNumber(Number(nutrition.proteinPercent), defaults.nutrition.proteinPercent),
       carbPercent: toNonNegativeNumber(Number(nutrition.carbPercent), defaults.nutrition.carbPercent),
       fatPercent: toNonNegativeNumber(Number(nutrition.fatPercent), defaults.nutrition.fatPercent),
-      fiberGrams: toNonNegativeNumber(Number(nutrition.fiberGrams), defaults.nutrition.fiberGrams)
+      fiberGrams: toNonNegativeNumber(Number(nutrition.fiberGrams), defaults.nutrition.fiberGrams),
+      proteinTargetGrams: toNonNegativeNumber(Number(nutrition.proteinTargetGrams), defaults.nutrition.proteinTargetGrams),
+      carbsTargetGrams: toNonNegativeNumber(Number(nutrition.carbsTargetGrams), defaults.nutrition.carbsTargetGrams),
+      fatTargetGrams: toNonNegativeNumber(Number(nutrition.fatTargetGrams), defaults.nutrition.fatTargetGrams),
+      sleepTarget: toNonNegativeNumber(Number(nutrition.sleepTarget), defaults.nutrition.sleepTarget),
+      waterTarget: toNonNegativeNumber(Number(nutrition.waterTarget), defaults.nutrition.waterTarget),
+      weightTarget: toNonNegativeNumber(Number(nutrition.weightTarget), defaults.nutrition.weightTarget)
     },
     meals,
     reminders,
@@ -467,42 +483,27 @@ export function useProfileSettings() {
         updated_at: new Date().toISOString()
       });
 
-      await settingsTable.put(normalized);
-      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(normalized));
-      setForm(normalized);
-
       const calories = normalized.nutrition.calorieBudget;
       const proteinGrams = round1((calories * (normalized.nutrition.proteinPercent / 100)) / 4);
       const carbGrams = round1((calories * (normalized.nutrition.carbPercent / 100)) / 4);
       const fatGrams = round1((calories * (normalized.nutrition.fatPercent / 100)) / 9);
 
-      const today = TODAY();
+      const enriched = normalizeSettings({
+        ...normalized,
+        nutrition: {
+          ...normalized.nutrition,
+          proteinTargetGrams: proteinGrams,
+          carbsTargetGrams: carbGrams,
+          fatTargetGrams: fatGrams
+        },
+        updated_at: new Date().toISOString()
+      });
+
+      await settingsTable.put(enriched);
+      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(enriched));
+      setForm(enriched);
+
       const userId = session?.user?.id ?? 'local-user';
-
-      const existingTodayGoal = await db.goals
-        .where('start_date')
-        .equals(today)
-        .and((goal) => goal.user_id === userId)
-        .first();
-
-      const upsertGoal: Goal = {
-        id: existingTodayGoal?.id ?? generateId(),
-        user_id: userId,
-        start_date: today,
-        calories_target: calories,
-        protein_target: proteinGrams,
-        carbs_target: carbGrams,
-        fat_target: fatGrams,
-        sleep_target: existingTodayGoal?.sleep_target,
-        water_target: existingTodayGoal?.water_target,
-        weight_target: existingTodayGoal?.weight_target,
-        synced: 0,
-        created_at: existingTodayGoal?.created_at ?? new Date(),
-        updated_at: new Date()
-      };
-
-      await db.goals.put(upsertGoal);
-
       const currentProfile = await db.profiles.get(userId);
       const upsertProfile: Profile = {
         id: userId,

@@ -463,6 +463,7 @@ export function useWorkoutSession(workoutId: string | null, isEditingCompleted =
                     name: title.trim() || workout.name || 'Workout',
                     notes: description.trim() || undefined,
                     end_time: endTime,
+                    updated_at: new Date(),
                     synced: 0
                 });
             });

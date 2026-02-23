@@ -5,18 +5,7 @@ import { NutritionSection } from './components/NutritionSection';
 import { DietarySection } from './components/DietarySection';
 import { MealsSection } from './components/MealsSection';
 import { RemindersSection } from './components/RemindersSection';
-import { AdminSection } from './components/AdminSection';
 import { REMINDER_KEYS, useProfileSettings } from './useProfileSettings';
-import {
-  clearAllSyncQueueLocal,
-  clearFailedSyncQueueLocal,
-  clearLocalDataAndReload,
-  getLocalSyncQueueSummary,
-  resetLocalSyncCursor,
-  runGlobalAdminAction,
-  type GlobalAdminAction
-} from '../../lib/adminMaintenance';
-import { syncManager } from '../../lib/sync';
 
 export default function ProfileSettings() {
   const {
@@ -65,47 +54,6 @@ export default function ProfileSettings() {
     applyAdaptiveMealPlanToToday,
     saveAllSettings
   } = useProfileSettings();
-
-  const [queueSummary, setQueueSummary] = useState({ total: 0, pending: 0, failed: 0 });
-  const [busyAction, setBusyAction] = useState<string | null>(null);
-  const [adminToken, setAdminToken] = useState('');
-  const [adminStatus, setAdminStatus] = useState<string | null>(null);
-
-  const refreshQueueSummary = async () => {
-    const summary = await getLocalSyncQueueSummary();
-    setQueueSummary({
-      total: summary.total,
-      pending: summary.pending,
-      failed: summary.failed
-    });
-  };
-
-  useEffect(() => {
-    void refreshQueueSummary();
-  }, []);
-
-  const runAdminAction = async (actionName: string, action: () => Promise<void>) => {
-    try {
-      setBusyAction(actionName);
-      setAdminStatus(null);
-      await action();
-      await refreshQueueSummary();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error ?? 'Unknown error');
-      setAdminStatus(`Failed: ${message}`);
-    } finally {
-      setBusyAction(null);
-    }
-  };
-
-  const handleRunGlobalAction = async (action: GlobalAdminAction) => {
-    await runAdminAction(`global:${action}`, async () => {
-      const result = await runGlobalAdminAction(action, adminToken || undefined);
-      const details = result.summary ? ` ${JSON.stringify(result.summary)}` : '';
-      setAdminStatus(result.message ?? `Completed ${action}.${details}`);
-      await syncManager.sync();
-    });
-  };
 
   if (loading) {
     return <div className="p-10 text-center text-text-muted">Loading...</div>;
@@ -207,51 +155,6 @@ export default function ProfileSettings() {
             reminderKeys={REMINDER_KEYS}
             reminders={form.reminders}
             updateReminder={updateReminder}
-          />
-
-          <AdminSection
-            isOpen={openSection === 'admin'}
-            onToggle={() => setOpenSection((prev) => (prev === 'admin' ? null : 'admin'))}
-            queueSummary={queueSummary}
-            busyAction={busyAction}
-            adminToken={adminToken}
-            setAdminToken={setAdminToken}
-            onRefreshSummary={() => {
-              void runAdminAction('refresh-summary', async () => {
-                await refreshQueueSummary();
-                setAdminStatus('Queue summary refreshed.');
-              });
-            }}
-            onClearFailedQueue={() => {
-              void runAdminAction('clear-failed-queue', async () => {
-                const removed = await clearFailedSyncQueueLocal(3);
-                setAdminStatus(`Cleared ${removed} failed queue item(s) locally.`);
-              });
-            }}
-            onClearAllQueue={() => {
-              void runAdminAction('clear-all-queue', async () => {
-                const removed = await clearAllSyncQueueLocal();
-                setAdminStatus(`Cleared ${removed} queued item(s) locally.`);
-              });
-            }}
-            onForceFullSyncAndReconcile={() => {
-              void runAdminAction('force-full-sync-reconcile', async () => {
-                await resetLocalSyncCursor();
-                await syncManager.sync();
-                setAdminStatus('Forced full sync and delete reconciliation for this device.');
-              });
-            }}
-            onResetLocalDb={() => {
-              if (!confirm('This will clear local IndexedDB + storage on this device and reload. Continue?')) return;
-              void runAdminAction('reset-local-db', async () => {
-                setAdminStatus('Resetting local data and reloading...');
-                await clearLocalDataAndReload();
-              });
-            }}
-            onRunGlobalAction={(action) => {
-              void handleRunGlobalAction(action);
-            }}
-            statusMessage={adminStatus}
           />
 
           {canSaveSettings ? (
