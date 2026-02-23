@@ -164,6 +164,37 @@ function buildDailyCoachPrompt(input: {
   allergies: string[];
   mealPattern: string;
   goalFocus: string;
+  activityLevel: string;
+  medicalConstraints: string[];
+  daySummary: string;
+  coachStyle: string;
+  timeOfDay: string;
+  expectedProgressPercent: number;
+  actualProgressPercent: number;
+  caloriePacingDelta: number;
+  macroPacingDelta: {
+    protein: number;
+    carbs: number;
+    fat: number;
+  };
+  fiber: {
+    goal: number;
+    consumed: number;
+    remaining: number;
+  };
+  eaaCoveragePercent: number;
+  topEaaDeficits: Array<{ group: string; deficit: number }>;
+  topMicronutrientDeficits: Array<{ nutrient: string; deficit: number }>;
+  mealTiming: {
+    score: number;
+    summary: string;
+    advice: string;
+  };
+  weightTrend7d: {
+    deltaKg: number;
+    distanceToGoalKg: number | null;
+    progressPercent: number | null;
+  };
 }): string {
   return `You are a practical nutrition and recovery coach.
 Generate one concise daily suggestion for the user based on this context:
@@ -182,6 +213,10 @@ Rules:
 - Keep each text short and actionable.
 - warning_text can be empty string when no warning is needed.
 - food_or_recipe must respect dietTags/allergies.
+- Prioritize context in this order: safety constraints, timeOfDay pacing, biggest nutrition deficit, then habit consistency.
+- Use expectedProgressPercent vs actualProgressPercent so guidance fits morning/midday/evening.
+- If daySummary indicates low motivation/stress, keep advice simpler and lower-friction.
+- Respect coachStyle: strict = direct/firm, gentle = supportive/encouraging.
 - why must include 2-3 short bullets derived from provided numbers.
 - No markdown, no prose outside JSON, no extra keys.`;
 }
@@ -375,7 +410,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    const recipeName = String(body?.recipeName || '').trim();
     if (action === 'daily_coach') {
       const date = String(body?.date || '').trim();
       if (!date) {
@@ -386,6 +420,37 @@ Deno.serve(async (req) => {
         const parsed = Number(value);
         return Number.isFinite(parsed) ? parsed : 0;
       };
+
+      const toStringArray = (value: unknown) =>
+        Array.isArray(value) ? value.map((item: unknown) => String(item)).filter(Boolean) : [];
+
+      const toTopEaaDeficits = (value: unknown) =>
+        Array.isArray(value)
+          ? value
+              .map((entry) => {
+                if (!entry || typeof entry !== 'object') return null;
+                const row = entry as { group?: unknown; deficit?: unknown };
+                return {
+                  group: String(row.group || '').trim(),
+                  deficit: toFiniteNumber(row.deficit)
+                };
+              })
+              .filter((entry): entry is { group: string; deficit: number } => Boolean(entry && entry.group))
+          : [];
+
+      const toTopMicronutrientDeficits = (value: unknown) =>
+        Array.isArray(value)
+          ? value
+              .map((entry) => {
+                if (!entry || typeof entry !== 'object') return null;
+                const row = entry as { nutrient?: unknown; deficit?: unknown };
+                return {
+                  nutrient: String(row.nutrient || '').trim(),
+                  deficit: toFiniteNumber(row.deficit)
+                };
+              })
+              .filter((entry): entry is { nutrient: string; deficit: number } => Boolean(entry && entry.nutrient))
+          : [];
 
       const prompt = buildDailyCoachPrompt({
         date,
@@ -404,10 +469,51 @@ Deno.serve(async (req) => {
         workoutsToday: toFiniteNumber(body?.workoutsToday),
         workoutMinutesWeek: toFiniteNumber(body?.workoutMinutesWeek),
         todayLogsCount: toFiniteNumber(body?.todayLogsCount),
-        dietTags: Array.isArray(body?.dietTags) ? body.dietTags.map((value: unknown) => String(value)) : [],
-        allergies: Array.isArray(body?.allergies) ? body.allergies.map((value: unknown) => String(value)) : [],
+        dietTags: toStringArray(body?.dietTags),
+        allergies: toStringArray(body?.allergies),
         mealPattern: String(body?.mealPattern || '').trim(),
-        goalFocus: String(body?.goalFocus || '').trim()
+        goalFocus: String(body?.goalFocus || '').trim(),
+        activityLevel: String(body?.activityLevel || '').trim(),
+        medicalConstraints: toStringArray(body?.medicalConstraints),
+        daySummary: String(body?.daySummary || '').trim(),
+        coachStyle: String(body?.coachStyle || 'gentle').trim(),
+        timeOfDay: String(body?.timeOfDay || '').trim(),
+        expectedProgressPercent: toFiniteNumber(body?.expectedProgressPercent),
+        actualProgressPercent: toFiniteNumber(body?.actualProgressPercent),
+        caloriePacingDelta: toFiniteNumber(body?.caloriePacingDelta),
+        macroPacingDelta: {
+          protein: toFiniteNumber((body?.macroPacingDelta as { protein?: unknown } | undefined)?.protein),
+          carbs: toFiniteNumber((body?.macroPacingDelta as { carbs?: unknown } | undefined)?.carbs),
+          fat: toFiniteNumber((body?.macroPacingDelta as { fat?: unknown } | undefined)?.fat)
+        },
+        fiber: {
+          goal: toFiniteNumber((body?.fiber as { goal?: unknown } | undefined)?.goal),
+          consumed: toFiniteNumber((body?.fiber as { consumed?: unknown } | undefined)?.consumed),
+          remaining: toFiniteNumber((body?.fiber as { remaining?: unknown } | undefined)?.remaining)
+        },
+        eaaCoveragePercent: toFiniteNumber(body?.eaaCoveragePercent),
+        topEaaDeficits: toTopEaaDeficits(body?.topEaaDeficits).slice(0, 2),
+        topMicronutrientDeficits: toTopMicronutrientDeficits(body?.topMicronutrientDeficits).slice(0, 5),
+        mealTiming: {
+          score: toFiniteNumber((body?.mealTiming as { score?: unknown } | undefined)?.score),
+          summary: String((body?.mealTiming as { summary?: unknown } | undefined)?.summary || '').trim(),
+          advice: String((body?.mealTiming as { advice?: unknown } | undefined)?.advice || '').trim()
+        },
+        weightTrend7d: {
+          deltaKg: toFiniteNumber((body?.weightTrend7d as { deltaKg?: unknown } | undefined)?.deltaKg),
+          distanceToGoalKg: (() => {
+            const raw = (body?.weightTrend7d as { distanceToGoalKg?: unknown } | undefined)?.distanceToGoalKg;
+            if (raw === null || raw === undefined || raw === '') return null;
+            const parsed = Number(raw);
+            return Number.isFinite(parsed) ? parsed : null;
+          })(),
+          progressPercent: (() => {
+            const raw = (body?.weightTrend7d as { progressPercent?: unknown } | undefined)?.progressPercent;
+            if (raw === null || raw === undefined || raw === '') return null;
+            const parsed = Number(raw);
+            return Number.isFinite(parsed) ? parsed : null;
+          })()
+        }
       });
 
       const result = await model.generateContent(prompt);

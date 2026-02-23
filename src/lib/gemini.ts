@@ -142,6 +142,37 @@ export async function fetchGeminiDailyCoach(input: {
   allergies: string[];
   mealPattern: string;
   goalFocus: string;
+  activityLevel: string;
+  medicalConstraints: string[];
+  daySummary: string;
+  coachStyle: 'gentle' | 'strict';
+  timeOfDay: string;
+  expectedProgressPercent: number;
+  actualProgressPercent: number;
+  caloriePacingDelta: number;
+  macroPacingDelta: {
+    protein: number;
+    carbs: number;
+    fat: number;
+  };
+  fiber: {
+    goal: number;
+    consumed: number;
+    remaining: number;
+  };
+  eaaCoveragePercent: number;
+  topEaaDeficits: Array<{ group: string; deficit: number }>;
+  topMicronutrientDeficits: Array<{ nutrient: string; deficit: number }>;
+  mealTiming: {
+    score: number;
+    summary: string;
+    advice: string;
+  };
+  weightTrend7d: {
+    deltaKg: number;
+    distanceToGoalKg: number | null;
+    progressPercent: number | null;
+  };
 }): Promise<GeminiDailyCoachPayload> {
   return invokeGeminiFunction<GeminiDailyCoachPayload>({
     action: 'daily_coach',

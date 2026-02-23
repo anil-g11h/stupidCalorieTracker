@@ -1,2 +1,5 @@
 [functions.admin-maintenance]
 verify_jwt = false
+
+[functions.gemini-food-nutrition]
+verify_jwt = false

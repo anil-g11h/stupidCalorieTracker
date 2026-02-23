@@ -3,9 +3,11 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { Link } from 'react-router-dom';
 import { db } from '../../lib/db';
 import RouteHeader from '../../lib/components/RouteHeader';
+import { useStackNavigation } from '../../lib/useStackNavigation';
 
 export default function FoodList() {
   const [searchQuery, setSearchQuery] = useState('');
+  const { pop } = useStackNavigation();
 
   // Subscribe to the foods table
   const foods = useLiveQuery(() => db.foods.toArray());
@@ -25,6 +27,7 @@ export default function FoodList() {
     <div className="bg-page font-sans">
       <RouteHeader
         title="Foods"
+        onBack={() => pop()}
         rightAction={
           <div className="flex items-center gap-2">
             <Link
@@ -66,7 +69,7 @@ export default function FoodList() {
             {filteredFoods.map((food) => (
               <Link
                 key={food.id}
-                to={`/foods/${food.id}`}
+                to={`/foods/${food.id}/edit`}
                 className="bg-card p-4 rounded-xl shadow-sm border border-border-subtle flex justify-between items-center hover:bg-surface transition-colors"
               >
                 <div>

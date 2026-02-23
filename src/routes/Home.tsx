@@ -4,9 +4,11 @@ import { useSearchParams } from 'react-router-dom';
 import { db, type BodyMetric, type Food, type Profile, type UserSettings } from '../lib/db';
 import { generateId } from '../lib';
 import { fetchGeminiDailyCoach, type GeminiDailyCoachPayload } from '../lib/gemini';
+import { analyzeEaaRatio } from '../lib/eaa';
 import { supabase } from '../lib/supabaseClient';
 import { useStackNavigation } from '../lib/useStackNavigation';
 import RouteHeader from '../lib/components/RouteHeader';
+import { getFastingWindowHint, getMealTimingAdvice } from './profile/mealPlanning';
 
 type SettingsRow = UserSettings & { id: 'local-settings' };
 
@@ -61,8 +63,44 @@ const WATER_PORTION_OPTIONS = [
 ];
 
 const DEFAULT_FIRST_WEIGHT_KG = 70;
+const COACH_STYLE_STORAGE_KEY = 'ai-coach-style-v1';
 const HOME_PANELS = ['weight', 'water', 'sleep'] as const;
 type HomePanel = (typeof HOME_PANELS)[number];
+type CoachStyle = 'gentle' | 'strict';
+
+const ESSENTIAL_MICRO_TARGETS = [
+  { label: 'Vitamin A', target: 900, aliases: ['vitamin_a', 'vitamin a', 'retinol', 'vitamin a rae'] },
+  { label: 'Vitamin C', target: 90, aliases: ['vitamin_c', 'vitamin c', 'ascorbic acid'] },
+  { label: 'Vitamin D', target: 15, aliases: ['vitamin_d', 'vitamin d', 'vitamin d3', 'cholecalciferol'] },
+  { label: 'Vitamin E', target: 15, aliases: ['vitamin_e', 'vitamin e', 'alpha tocopherol', 'tocopherol'] },
+  { label: 'Vitamin B12', target: 2.4, aliases: ['vitamin_b12', 'vitamin b12', 'b12', 'cobalamin'] },
+  { label: 'Folate', target: 400, aliases: ['folate', 'vitamin_b9', 'vitamin b9', 'folic acid', 'b9'] },
+  { label: 'Calcium', target: 1000, aliases: ['calcium'] },
+  { label: 'Magnesium', target: 400, aliases: ['magnesium'] },
+  { label: 'Potassium', target: 4700, aliases: ['potassium'] },
+  { label: 'Iron', target: 8, aliases: ['iron'] }
+] as const;
+
+function normalizeMicroKey(value: string) {
+  return value.trim().toLowerCase().replace(/[\s_-]+/g, ' ');
+}
+
+function toMinutesFromTime(time: string) {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(time.trim());
+  if (!match) return null;
+  const hh = Number(match[1]);
+  const mm = Number(match[2]);
+  if (!Number.isFinite(hh) || !Number.isFinite(mm)) return null;
+  if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return null;
+  return hh * 60 + mm;
+}
+
+function getTimeOfDayLabel(hour: number) {
+  if (hour < 11) return 'morning';
+  if (hour < 16) return 'midday';
+  if (hour < 21) return 'evening';
+  return 'night';
+}
 
 function isHomePanel(value: string | null): value is HomePanel {
   return value !== null && HOME_PANELS.includes(value as HomePanel);
@@ -101,6 +139,7 @@ export default function Home() {
   const [coachStatus, setCoachStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [coachSuggestion, setCoachSuggestion] = useState<GeminiDailyCoachPayload | null>(null);
   const [coachError, setCoachError] = useState('');
+  const [coachStyle, setCoachStyle] = useState<CoachStyle>('gentle');
 
   const recentWeight = useLiveQuery(
     async () => {
@@ -198,6 +237,8 @@ export default function Home() {
     return {
       profile,
       settings,
+      todayLogs,
+      foodsMap,
       todayLogsCount: todayLogs.length,
       calorieTotals,
       workoutsCount: workouts.length,
@@ -327,6 +368,150 @@ export default function Home() {
   const allergies = [...(data?.profile?.allergies ?? []), ...(data?.profile?.custom_allergies ?? [])];
   const mealPattern = data?.profile?.meal_pattern ?? '';
   const goalFocus = data?.profile?.goal_focus ?? '';
+  const activityLevel = data?.profile?.activity_level ?? '';
+  const medicalConstraints = data?.profile?.medical_constraints ?? [];
+
+  const coachContext = useMemo(() => {
+    const logs = data?.todayLogs ?? [];
+    const foodsMap = data?.foodsMap ?? {};
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+    const currentHour = now.getHours();
+
+    const mealSettings = data?.settings?.meals ?? [];
+    const expectedCaloriesByNow = mealSettings.reduce((sum, meal) => {
+      const minutes = toMinutesFromTime(meal.time || '');
+      if (minutes === null || minutes > nowMinutes) return sum;
+
+      const targetValue = Number(meal.targetValue) || 0;
+      if (targetValue <= 0) return sum;
+
+      if (meal.targetMode === 'percent') {
+        return sum + (calorieGoal * targetValue) / 100;
+      }
+
+      return sum + targetValue;
+    }, 0);
+
+    const expectedProgressPercent =
+      expectedCaloriesByNow > 0
+        ? Math.min(100, (expectedCaloriesByNow / Math.max(1, calorieGoal)) * 100)
+        : Math.min(100, (nowMinutes / 1440) * 100);
+
+    const actualProgressPercent = Math.min(100, (caloriesConsumed / Math.max(1, calorieGoal)) * 100);
+
+    const macroExpected = {
+      protein: (proteinGoal * expectedProgressPercent) / 100,
+      carbs: (carbsGoal * expectedProgressPercent) / 100,
+      fat: (fatGoal * expectedProgressPercent) / 100
+    };
+
+    const fiberGoalLocal = Math.max(0, data?.settings?.nutrition?.fiberGrams ?? 30);
+    const microsConsumed: Record<string, number> = {};
+    let fiberConsumed = 0;
+
+    logs.forEach((log) => {
+      const food = foodsMap[log.food_id];
+      if (!food?.micros) return;
+      const amount = Number(log.amount_consumed) || 0;
+      if (amount <= 0) return;
+
+      Object.entries(food.micros).forEach(([key, value]) => {
+        const numericValue = (Number(value) || 0) * amount;
+        if (numericValue <= 0) return;
+        const normalized = normalizeMicroKey(key);
+        if (/^fibre$|^fiber$|^dietary\s*fiber$/i.test(normalized)) {
+          fiberConsumed += numericValue;
+          return;
+        }
+        microsConsumed[normalized] = (microsConsumed[normalized] || 0) + numericValue;
+      });
+    });
+
+    const topMicronutrientDeficits = ESSENTIAL_MICRO_TARGETS.map((target) => {
+      const consumed = target.aliases.reduce((sum, alias) => sum + (microsConsumed[normalizeMicroKey(alias)] || 0), 0);
+      return {
+        nutrient: target.label,
+        deficit: Math.max(0, Math.round((target.target - consumed) * 10) / 10)
+      };
+    })
+      .filter((item) => item.deficit > 0)
+      .sort((a, b) => b.deficit - a.deficit)
+      .slice(0, 5);
+
+    const eaa = analyzeEaaRatio(
+      logs.map((log) => {
+        const food = foodsMap[log.food_id];
+        return {
+          proteinGrams: Number(food?.protein) || 0,
+          amountConsumed: Number(log.amount_consumed) || 0,
+          micros: food?.micros
+        };
+      })
+    );
+
+    const topEaaDeficits = Object.entries(eaa.deficitByGroup)
+      .map(([group, value]) => ({ group, deficit: Math.round((value || 0) * 100) / 100 }))
+      .filter((entry) => entry.deficit > 0)
+      .sort((a, b) => b.deficit - a.deficit)
+      .slice(0, 2);
+
+    const fastingWindowHint = getFastingWindowHint(mealPattern, mealSettings as any);
+    const mealTimingAdvice = getMealTimingAdvice(mealSettings as any, mealPattern, fastingWindowHint);
+
+    const delta7dKg =
+      weightTrend.firstKg !== null && weightTrend.lastKg !== null
+        ? Math.round((weightTrend.lastKg - weightTrend.firstKg) * 10) / 10
+        : 0;
+
+    return {
+      timeOfDay: getTimeOfDayLabel(currentHour),
+      expectedProgressPercent: Math.round(expectedProgressPercent),
+      actualProgressPercent: Math.round(actualProgressPercent),
+      caloriePacingDelta: Math.round((actualProgressPercent - expectedProgressPercent) * 10) / 10,
+      macroPacingDelta: {
+        protein: Math.round((proteinConsumed - macroExpected.protein) * 10) / 10,
+        carbs: Math.round((carbsConsumed - macroExpected.carbs) * 10) / 10,
+        fat: Math.round((fatConsumed - macroExpected.fat) * 10) / 10
+      },
+      fiber: {
+        goal: Math.round(fiberGoalLocal),
+        consumed: Math.round(fiberConsumed * 10) / 10,
+        remaining: Math.max(0, Math.round((fiberGoalLocal - fiberConsumed) * 10) / 10)
+      },
+      eaaCoveragePercent: Math.round((eaa.proteinTotal > 0 ? (eaa.proteinWithEaaData / eaa.proteinTotal) * 100 : 0) * 10) / 10,
+      topEaaDeficits,
+      topMicronutrientDeficits,
+      mealTiming: {
+        score: mealTimingAdvice.score,
+        summary: mealTimingAdvice.summary,
+        advice: mealTimingAdvice.advice
+      },
+      weightTrend7d: {
+        deltaKg: delta7dKg,
+        distanceToGoalKg: distanceToGoalKg !== null ? Math.round(distanceToGoalKg * 10) / 10 : null,
+        progressPercent: goalJourneyProgress !== null ? Math.round(goalJourneyProgress) : null
+      }
+    };
+  }, [
+    data?.todayLogs,
+    data?.foodsMap,
+    data?.settings?.meals,
+    data?.settings?.nutrition?.fiberGrams,
+    now,
+    calorieGoal,
+    caloriesConsumed,
+    proteinGoal,
+    carbsGoal,
+    fatGoal,
+    proteinConsumed,
+    carbsConsumed,
+    fatConsumed,
+    mealPattern,
+    weightTrend.firstKg,
+    weightTrend.lastKg,
+    distanceToGoalKg,
+    goalJourneyProgress
+  ]);
 
   useEffect(() => {
     if (previousWeightKg !== null) {
@@ -370,6 +555,19 @@ export default function Home() {
     const nextPanel = isHomePanel(panelFromQuery) ? panelFromQuery : null;
     setActiveHomePanel((prev) => (prev === nextPanel ? prev : nextPanel));
   }, [searchParams]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const saved = window.localStorage.getItem(COACH_STYLE_STORAGE_KEY);
+    if (saved === 'strict' || saved === 'gentle') {
+      setCoachStyle(saved);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(COACH_STYLE_STORAGE_KEY, coachStyle);
+  }, [coachStyle]);
 
   const saveWeightMetric = async (valueInput: number, dateInput?: string, unitInput?: string) => {
     const value = Number(valueInput);
@@ -625,7 +823,12 @@ export default function Home() {
         dietTags,
         allergies,
         mealPattern,
-        goalFocus
+        goalFocus,
+        activityLevel,
+        medicalConstraints,
+        daySummary: daySummary.trim().slice(0, 280),
+        coachStyle,
+        ...coachContext
       });
 
       setCoachSuggestion({
@@ -1069,14 +1272,24 @@ export default function Home() {
               <p className="text-sm font-bold uppercase tracking-wide text-text-muted">AI coach</p>
               <p className="text-xs text-text-muted mt-1">Runs only when you tap the button</p>
             </div>
-            <button
-              type="button"
-              onClick={() => void generateCoachSuggestion()}
-              disabled={coachStatus === 'loading'}
-              className="rounded-lg bg-brand px-3 py-1.5 text-xs font-bold text-brand-fg disabled:opacity-60"
-            >
-              {coachStatus === 'loading' ? 'Loading...' : coachStatus === 'ready' ? 'Refresh suggestion' : 'Get AI suggestion'}
-            </button>
+            <div className="flex flex-col items-end gap-2">
+              <select
+                value={coachStyle}
+                onChange={(event) => setCoachStyle(event.target.value as CoachStyle)}
+                className="rounded-lg border border-border-subtle bg-surface px-2 py-1 text-[11px] text-text-main"
+              >
+                <option value="gentle">Gentle coach</option>
+                <option value="strict">Strict coach</option>
+              </select>
+              <button
+                type="button"
+                onClick={() => void generateCoachSuggestion()}
+                disabled={coachStatus === 'loading'}
+                className="rounded-lg bg-brand px-3 py-1.5 text-xs font-bold text-brand-fg disabled:opacity-60"
+              >
+                {coachStatus === 'loading' ? 'Loading...' : coachStatus === 'ready' ? 'Refresh suggestion' : 'Get AI suggestion'}
+              </button>
+            </div>
           </div>
 
           {coachStatus === 'idle' ? (

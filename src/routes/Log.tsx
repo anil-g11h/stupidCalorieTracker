@@ -16,6 +16,9 @@ const SETTINGS_KEY = 'stupid_tracker_settings_v1';
 const SETTINGS_ID = 'local-settings';
 const DEFAULT_MEAL_IDS = ['breakfast', 'lunch', 'dinner', 'snack', 'supplement'] as const;
 const WEIGHT_BASED_REGEX = /^(g|ml|oz)$/i;
+const FIBER_KEY_REGEX = /^fibre$|^fiber$|^dietary[_\s-]*fiber$/i;
+
+type MacroTabKey = 'protein' | 'carbs' | 'fat' | 'fiber';
 
 type MealTargetMode = 'percent' | 'calories';
 
@@ -214,6 +217,13 @@ function normalizeKey(value: string): string {
   return value.trim().toLowerCase();
 }
 
+function normalizeServingUnitLabel(value: unknown): string {
+  const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  if (!normalized) return 'gram';
+  if (normalized === 'g' || normalized === 'gram' || normalized === 'grams') return 'gram';
+  return normalized;
+}
+
 function slugify(value: string): string {
   return value
     .trim()
@@ -405,12 +415,15 @@ function circularMinuteDistance(a: number, b: number): number {
 export default function DailyLogPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [settings, setSettings] = useState<TrackerSettings | null>(() => readSettingsFromLocalStorage());
-  const [showAnalytics, setShowAnalytics] = useState(false);
   const [showMicronutrients, setShowMicronutrients] = useState(false);
+  const [activeMacroTab, setActiveMacroTab] = useState<MacroTabKey>('protein');
   const [timeTick, setTimeTick] = useState(() => Date.now());
   const [openActionsLogId, setOpenActionsLogId] = useState<string | null>(null);
 
   const date = searchParams.get('date') || new Date().toISOString().split('T')[0];
+  const activePanel = searchParams.get('panel');
+  const isReportView = activePanel === 'report';
+  const showAnalytics = isReportView;
   const isToday = date === new Date().toISOString().split('T')[0];
 
   useEffect(() => {
@@ -463,7 +476,40 @@ export default function DailyLogPage() {
   const changeDate = (days: number) => {
     const next = new Date(date);
     next.setDate(next.getDate() + days);
-    setSearchParams({ date: next.toISOString().split('T')[0] });
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set('date', next.toISOString().split('T')[0]);
+    setSearchParams(nextParams);
+  };
+
+  const setPanelWithTransition = (panel: 'report' | null, direction: 'forward' | 'backward') => {
+    const shouldReplace = panel === null;
+    const updatePanel = () => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (panel) {
+            next.set('panel', panel);
+          } else {
+            next.delete('panel');
+          }
+          return next;
+        },
+        { replace: shouldReplace }
+      );
+    };
+
+    if (!document.startViewTransition) {
+      updatePanel();
+      return;
+    }
+
+    document.documentElement.classList.add(`transition-${direction}`);
+    const transition = document.startViewTransition(() => {
+      updatePanel();
+    });
+    transition.finished.finally(() => {
+      document.documentElement.classList.remove(`transition-${direction}`);
+    });
   };
 
   const data = useLiveQuery(async () => {
@@ -536,8 +582,6 @@ export default function DailyLogPage() {
   const fiberGoal = Math.max(0, settings?.nutrition?.fiberGrams ?? 30);
 
   const analytics = useMemo(() => {
-    const fiberKeyRegex = /^fibre$|^fiber$|^dietary[_\s-]*fiber$/i;
-
     const totals = {
       protein: dailyTotals.protein,
       carbs: dailyTotals.carbs,
@@ -555,7 +599,7 @@ export default function DailyLogPage() {
         const amount = (Number(value) || 0) * (Number(log.amount_consumed) || 0);
         if (amount <= 0) return;
 
-        if (fiberKeyRegex.test(key.trim())) {
+        if (FIBER_KEY_REGEX.test(key.trim())) {
           totals.fiber += amount;
         } else {
           microsConsumed[key] = (microsConsumed[key] || 0) + amount;
@@ -591,6 +635,90 @@ export default function DailyLogPage() {
       }
     };
   }, [dailyTotals, extendedLogs, goals.protein, goals.carbs, goals.fat, fiberGoal]);
+
+  const macroContributors = useMemo(() => {
+    const byFood = new Map<string, {
+      id: string;
+      name: string;
+      protein: number;
+      carbs: number;
+      fat: number;
+      fiber: number;
+      loggedAmount: number;
+      loggedUnit: string;
+      loggedCalories: number;
+    }>();
+
+    extendedLogs.forEach((log) => {
+      const amount = Number(log.amount_consumed) || 0;
+      if (amount <= 0) return;
+
+      const fallbackKey = `unknown-${(log.food?.name || 'food').trim().toLowerCase() || 'food'}`;
+      const foodKey = (typeof log.food_id === 'string' && log.food_id.trim()) ? log.food_id.trim() : fallbackKey;
+      const name = log.food?.name || 'Unknown Food';
+
+      const existing = byFood.get(foodKey) ?? {
+        id: foodKey,
+        name,
+        protein: 0,
+        carbs: 0,
+        fat: 0,
+        fiber: 0,
+        loggedAmount: 0,
+        loggedUnit: typeof log.food?.serving_unit === 'string' && log.food.serving_unit.trim() ? log.food.serving_unit : 'gram',
+        loggedCalories: 0
+      };
+
+      existing.protein += (Number(log.food?.protein) || 0) * amount;
+      existing.carbs += (Number(log.food?.carbs) || 0) * amount;
+      existing.fat += (Number(log.food?.fat) || 0) * amount;
+      existing.loggedCalories += Number(log.calories) || 0;
+
+      const servingSize = Number(log.food?.serving_size) || 0;
+      if (servingSize > 0 && typeof log.food?.serving_unit === 'string' && log.food.serving_unit.trim()) {
+        existing.loggedAmount += servingSize * amount;
+        existing.loggedUnit = log.food.serving_unit;
+      } else {
+        existing.loggedAmount += amount;
+      }
+
+      const micros = log.food?.micros;
+      if (micros) {
+        Object.entries(micros).forEach(([key, value]) => {
+          if (!FIBER_KEY_REGEX.test(key.trim())) return;
+          const fiberAmount = (Number(value) || 0) * amount;
+          if (fiberAmount > 0) {
+            existing.fiber += fiberAmount;
+          }
+        });
+      }
+
+      byFood.set(foodKey, existing);
+    });
+
+    return [...byFood.values()];
+  }, [extendedLogs]);
+
+  const macroTabConfig: { key: MacroTabKey; label: string }[] = [
+    { key: 'protein', label: 'Protein' },
+    { key: 'carbs', label: 'Carbs' },
+    { key: 'fat', label: 'Fat' },
+    { key: 'fiber', label: 'Fiber' }
+  ];
+
+  const selectedMacroContributors = useMemo(() => {
+    return macroContributors
+      .map((item) => ({
+        id: item.id,
+        name: item.name,
+        grams: item[activeMacroTab],
+        loggedAmount: item.loggedAmount,
+        loggedUnit: item.loggedUnit,
+        loggedCalories: item.loggedCalories
+      }))
+      .filter((item) => item.grams > 0)
+      .sort((a, b) => b.grams - a.grams);
+  }, [macroContributors, activeMacroTab]);
 
   const micronutrientTracking = useMemo(() => {
     const normalizedMicros = buildNormalizedMicrosMap(analytics.microsConsumed);
@@ -770,8 +898,9 @@ export default function DailyLogPage() {
   return (
     <div className="bg-page font-sans">
       <RouteHeader
-        title="Daily Log"
-        rightAction={
+        title={isReportView ? 'Nutrition Analytics' : 'Daily Log'}
+        onBack={isReportView ? () => setPanelWithTransition(null, 'backward') : undefined}
+        rightAction={isReportView ? null : (
           <div className="flex items-center gap-2">
             <div className="flex items-center justify-between w-auto bg-surface rounded-full px-1 py-1 border border-border-subtle shadow-sm">
               <button
@@ -785,7 +914,11 @@ export default function DailyLogPage() {
                 <input
                   type="date"
                   value={date}
-                  onChange={(e) => setSearchParams({ date: e.target.value })}
+                  onChange={(e) => {
+                    const nextParams = new URLSearchParams(searchParams);
+                    nextParams.set('date', e.target.value);
+                    setSearchParams(nextParams);
+                  }}
                   className="absolute inset-0 opacity-0 cursor-pointer z-10"
                 />
                 <span className="text-sm font-bold text-text-main leading-none flex items-center gap-1.5">
@@ -807,7 +940,7 @@ export default function DailyLogPage() {
               <Utensils size={20} />
             </Link>
           </div>
-        }
+        )}
       />
 
       <main className="max-w-md mx-auto p-4 space-y-5">
@@ -834,14 +967,16 @@ export default function DailyLogPage() {
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setShowAnalytics((prev) => !prev)}
-              className="p-1.5 rounded-full border border-border-subtle bg-surface text-text-muted hover:text-text-main hover:border-brand transition-colors self-start"
-              title="Nutrition Analytics"
-            >
-              <AnalyticsIcon size={16} />
-            </button>
+            {!isReportView && (
+              <button
+                type="button"
+                onClick={() => setPanelWithTransition('report', 'forward')}
+                className="p-1.5 rounded-full border border-border-subtle bg-surface text-text-muted hover:text-text-main hover:border-brand transition-colors self-start"
+                title="Nutrition Analytics"
+              >
+                <AnalyticsIcon size={16} />
+              </button>
+            )}
           </div>
 
           {showAnalytics && (
@@ -899,6 +1034,59 @@ export default function DailyLogPage() {
                     </div>
                   );
                 })}
+              </div>
+
+              <div className="bg-surface rounded-xl p-3 border border-border-subtle space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-semibold text-text-main">Macro contributors</p>
+                  <p className="text-[11px] text-text-muted">By grams toward selected goal</p>
+                </div>
+
+                <div className="grid grid-cols-4 gap-1.5">
+                  {macroTabConfig.map((tab) => {
+                    const isActive = activeMacroTab === tab.key;
+                    return (
+                      <button
+                        key={tab.key}
+                        type="button"
+                        onClick={() => setActiveMacroTab(tab.key)}
+                        className={`px-2 py-1.5 rounded-lg border text-[11px] font-semibold transition-colors ${
+                          isActive
+                            ? 'bg-card border-brand text-brand'
+                            : 'bg-card border-border-subtle text-text-muted hover:text-text-main hover:border-brand'
+                        }`}
+                      >
+                        {tab.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {selectedMacroContributors.length === 0 ? (
+                  <p className="text-xs text-text-muted">No food entries contributed to {activeMacroTab} for this day.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {selectedMacroContributors.map((item) => {
+                      const loggedAmountRounded = Math.round(item.loggedAmount * 10) / 10;
+                      const loggedUnitNormalized = normalizeServingUnitLabel(item.loggedUnit);
+                      const loggedCaloriesRounded = Math.round(item.loggedCalories);
+
+                      return (
+                        <div key={item.id} className="bg-card rounded-lg border border-border-subtle px-2.5 py-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="text-xs font-medium text-text-main truncate">{item.name}</p>
+                            <p className="text-xs font-semibold text-text-main whitespace-nowrap">
+                              {Math.round(item.grams * 10) / 10}g
+                            </p>
+                          </div>
+                          <p className="text-[11px] text-text-muted mt-0.5">
+                            {loggedAmountRounded} {loggedUnitNormalized} {loggedCaloriesRounded} calories
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               <div className="bg-surface rounded-xl p-3 border border-border-subtle space-y-3">
@@ -1042,7 +1230,7 @@ export default function DailyLogPage() {
           )}
         </div>
 
-        {mealSections.map((meal) => {
+        {!isReportView && mealSections.map((meal) => {
           const mealCalories = meal.logs.reduce((sum, log) => sum + log.calories, 0);
 
           return (

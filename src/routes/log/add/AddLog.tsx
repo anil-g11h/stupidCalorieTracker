@@ -11,6 +11,7 @@ import {
   hasDietaryPreferences,
   normalizeDietaryPreferences
 } from '../../../lib/dietaryProfile';
+import RouteHeader from '../../../lib/components/RouteHeader';
 
 const WEIGHT_BASED_REGEX = /^(g|ml|oz)$/i;
 
@@ -98,6 +99,7 @@ export default function AddLogEntry() {
   const [addedCount, setAddedCount] = useState(0);
   const [addedFoodIds, setAddedFoodIds] = useState<string[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [servingConfigMessage, setServingConfigMessage] = useState('');
 
   const settingsRow = useLiveQuery(async () => db.settings.get('local-settings'), []);
   const profileRow = useLiveQuery(
@@ -552,7 +554,13 @@ export default function AddLogEntry() {
   }, [selectedFood, quantity]);
 
   // --- Handlers ---
+  const hasValidServingSize = (food: Food) => {
+    const servingSize = Number(food.serving_size);
+    return Number.isFinite(servingSize) && servingSize > 0;
+  };
+
   const handleSelectFood = (food: Food) => {
+    setServingConfigMessage('');
     setSelectedFood(food);
     const isWeight = food.serving_unit && WEIGHT_BASED_REGEX.test(food.serving_unit);
     if (isWeight) {
@@ -561,12 +569,23 @@ export default function AddLogEntry() {
     } else {
       setSelectedUnit('serving');
       setInputValue(1);
+
+      if (!hasValidServingSize(food)) {
+        setServingConfigMessage('Set grams per serving in Edit Food before logging by serving.');
+      }
     }
   };
 
   const updateUnit = (newUnit: string) => {
     if (!selectedFood) return;
     const servingSize = selectedFood.serving_size || 1;
+
+    if (newUnit === 'serving' && !hasValidServingSize(selectedFood)) {
+      setServingConfigMessage('Set grams per serving in Edit Food before logging by serving.');
+      return;
+    }
+
+    setServingConfigMessage('');
     
     if (newUnit === 'serving' && selectedUnit !== 'serving') {
       setInputValue(prev => parseFloat((prev / servingSize).toFixed(2)));
@@ -578,6 +597,14 @@ export default function AddLogEntry() {
 
   const saveLog = async (stayOnPage = false) => {
     if (!selectedFood) return;
+
+    if (selectedUnit === 'serving' && !hasValidServingSize(selectedFood)) {
+      setServingConfigMessage('Set grams per serving in Edit Food before logging by serving.');
+      return;
+    }
+
+    setServingConfigMessage('');
+
     try {
       const entry = {
         id: logId || generateId(), // If logId exists, we update, else create
@@ -646,18 +673,23 @@ export default function AddLogEntry() {
   };
 
   return (
-    <div className="container mx-auto p-4 max-w-md">
-      <div className="flex items-center mb-4">
-        <h1 className="text-2xl font-bold text-text-main">Add to {mealLabel}</h1>
-        {!logId && (
-          <button
-            onClick={() => pop()}
-            className="ml-auto px-3 py-1.5 rounded-full text-xs font-bold bg-brand text-brand-fg hover:opacity-90 transition-opacity"
-          >
-            Done{addedCount > 0 ? ` (${addedCount})` : ''}
-          </button>
-        )}
-      </div>
+    <div className="bg-page">
+      <RouteHeader
+        title={`Add to ${mealLabel}`}
+        onBack={() => pop()}
+        rightAction={
+          !logId ? (
+            <button
+              onClick={() => pop()}
+              className="px-3 py-1.5 rounded-full text-xs font-bold bg-brand text-brand-fg hover:opacity-90 transition-opacity"
+            >
+              Done{addedCount > 0 ? ` (${addedCount})` : ''}
+            </button>
+          ) : null
+        }
+      />
+
+      <div className="container mx-auto p-4 max-w-md">
 
       {!selectedFood ? (
         <>
@@ -786,13 +818,25 @@ export default function AddLogEntry() {
               <span className="block text-sm font-medium text-text-muted">Quantity</span>
               {isWeightBased && (
                 <div className="flex items-center space-x-2 bg-surface rounded-lg p-1">
-                  <UnitBtn active={selectedUnit === 'serving'} onClick={() => updateUnit('serving')}>Serving</UnitBtn>
+                  <UnitBtn
+                    active={selectedUnit === 'serving'}
+                    onClick={() => updateUnit('serving')}
+                    disabled={!hasValidServingSize(selectedFood)}
+                  >
+                    Serving
+                  </UnitBtn>
                   <UnitBtn active={selectedUnit !== 'serving'} onClick={() => updateUnit(selectedFood.serving_unit!)}>
                     {selectedFood.serving_unit}
                   </UnitBtn>
                 </div>
               )}
             </div>
+
+            {servingConfigMessage && (
+              <p className="mb-2 text-xs text-text-main bg-surface border border-border-subtle rounded-lg px-2 py-1.5">
+                ⚠ {servingConfigMessage}
+              </p>
+            )}
             
             <div className="flex items-center space-x-4">
               <StepperBtn onClick={() => {
@@ -923,6 +967,7 @@ export default function AddLogEntry() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }
@@ -935,10 +980,11 @@ const StatBox = ({ value, label, color = "text-text-main" }: any) => (
   </div>
 );
 
-const UnitBtn = ({ active, onClick, children }: any) => (
+const UnitBtn = ({ active, onClick, children, disabled = false }: any) => (
   <button 
     onClick={onClick}
-    className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${active ? 'bg-brand text-brand-fg shadow-sm' : 'text-text-muted hover:text-text-main'}`}
+    disabled={disabled}
+    className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${active ? 'bg-brand text-brand-fg shadow-sm' : 'text-text-muted hover:text-text-main'} ${disabled ? 'opacity-50 cursor-not-allowed hover:text-text-muted' : ''}`}
   >
     {children}
   </button>

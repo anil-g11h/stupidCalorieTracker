@@ -13,7 +13,6 @@ import {
   DotsThreeVerticalIcon as MoreVertical,
   PencilSimpleIcon as Edit,
   TimerIcon as Timer,
-  CaretDownIcon as ChevronDown,
   BarbellIcon as Dumbbell
 } from "@phosphor-icons/react";
 import { db, type Workout, type WorkoutExerciseDef, type WorkoutLogEntry, type WorkoutSet } from '../../../lib/db';
@@ -25,6 +24,7 @@ import { useStackNavigation } from '../../../lib/useStackNavigation';
 import { useWorkoutSession } from './useWorkoutSession';
 import { DurationScrollerInput, getMetricColumns } from '../components/WorkoutSetComponents';
 import { syncWorkoutExerciseThumbnailPaths } from '../../../lib/workoutMedia';
+import RouteHeader from '../../../lib/components/RouteHeader';
 
 
 
@@ -669,34 +669,25 @@ const WorkoutSessionComponent = () => {
   }, [definitions]);
 
   return (
-    <div className="pb-32 pt-4 px-4 max-w-md mx-auto bg-background">
-      {/* Sticky Header */}
-      <header className="mb-6 sticky top-0 bg-background z-20 py-2 border-b border-border-subtle -mx-4 px-4">
-        <div className="flex justify-between items-center mb-2">
-          <div className="flex items-center gap-2 min-w-0">
-            {(showFinishScreen || showCompletedReadonly) && (
-              <button
-                onClick={() => {
-                  if (showFinishScreen) {
-                    transitionFinishScreen('backward', () => {
-                      setShowFinishScreen(false);
-                      if (isEditingCompleted) setIsEditingCompleted(false);
-                    });
-                    return;
-                  }
-                  pop();
-                }}
-                className="h-9 w-9 rounded-lg border border-border-subtle bg-surface text-text-main flex items-center justify-center"
-                aria-label="Back"
-              >
-                <ChevronDown size={18} className="rotate-90" />
-              </button>
-            )}
-            <h1 className="text-xl font-bold truncate">
-              {showFinishScreen ? 'Finish Workout' : showCompletedReadonly ? 'Workout Detail' : (workout?.name || 'Workout')}
-            </h1>
-          </div>
-          {showFinishScreen ? (
+    <div className="bg-page">
+      <RouteHeader
+        title={showFinishScreen ? 'Finish Workout' : showCompletedReadonly ? 'Workout Detail' : (workout?.name || 'Workout')}
+        onBack={
+          showFinishScreen || showCompletedReadonly
+            ? () => {
+                if (showFinishScreen) {
+                  transitionFinishScreen('backward', () => {
+                    setShowFinishScreen(false);
+                    if (isEditingCompleted) setIsEditingCompleted(false);
+                  });
+                  return;
+                }
+                pop();
+              }
+            : undefined
+        }
+        rightAction={
+          showFinishScreen ? (
             <button
               onClick={handleSaveFinishedWorkout}
               disabled={isSavingFinish}
@@ -765,17 +756,18 @@ const WorkoutSessionComponent = () => {
             >
               Finish
             </button>
-          )}
-        </div>
+          )
+        }
+      />
 
+      <div className="pb-32 pt-4 px-4 max-w-md mx-auto bg-background">
         {!showFinishScreen && !showCompletedReadonly && (
-          <div className="flex justify-between text-xs font-semibold text-text-muted uppercase">
+          <div className="mb-6 flex justify-between text-xs font-semibold text-text-muted uppercase">
             <StatItem label="Duration" value={elapsedTime} />
             <StatItem label="Volume" value={`${totalStats.volume} kg`} border />
             <StatItem label="Sets" value={totalStats.sets} border />
           </div>
         )}
-      </header>
 
       {canEditWorkout && showFinishScreen ? (
         <section className="rounded-2xl border border-border-subtle bg-card p-4 space-y-4">
@@ -1153,6 +1145,7 @@ const WorkoutSessionComponent = () => {
             barRef={barRef}
         />
       )}
+      </div>
     </div>
   );
 };

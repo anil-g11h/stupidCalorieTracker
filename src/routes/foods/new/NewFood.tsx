@@ -497,6 +497,8 @@ const CreateFood: React.FC = () => {
     return Math.round((protein * 4) + (carbs * 4) + (fat * 9));
   }, [protein, carbs, fat]);
 
+  const isServingUnit = servingUnit === 'serving';
+
   const copyAIPrompt = () => {
     const foodTarget = name || "[INSERT FOOD NAME]";
     const normalizedServingUnit = normalizeServingUnit(servingUnit);
@@ -588,6 +590,13 @@ const CreateFood: React.FC = () => {
     async function handleSubmit() {
     try {
       const now = new Date();
+      const normalizedServing = normalizeServingUnit(servingUnit);
+      const parsedServingSize = Number(servingSize);
+
+      if (normalizedServing === 'serving' && (!Number.isFinite(parsedServingSize) || parsedServingSize <= 0)) {
+        alert('Set grams for one serving before saving this food.');
+        return;
+      }
 
       if (isEditMode && editFoodId) {
         const existingFood = await db.foods.get(editFoodId);
@@ -607,8 +616,8 @@ const CreateFood: React.FC = () => {
           protein,
           carbs,
           fat,
-          serving_size: servingSize,
-          serving_unit: servingUnit,
+          serving_size: parsedServingSize,
+          serving_unit: normalizedServing,
           micros,
           is_recipe: existingFood.is_recipe,
           updated_at: now,
@@ -626,8 +635,8 @@ const CreateFood: React.FC = () => {
           protein,
           carbs,
           fat,
-          serving_size: servingSize,
-          serving_unit: servingUnit,
+          serving_size: parsedServingSize,
+          serving_unit: normalizedServing,
           micros,
           is_recipe: false,
           created_at: now,
@@ -713,13 +722,20 @@ const CreateFood: React.FC = () => {
         {/* Serving Size Setup */}
         <div className="flex items-end gap-4 p-4 bg-surface rounded-xl border border-border-subtle">
           <div className="flex-1">
-            <label className="block text-[10px] font-bold text-text-muted uppercase mb-1 ml-1">Serving Size</label>
+            <label className="block text-[10px] font-bold text-text-muted uppercase mb-1 ml-1">
+              {isServingUnit ? 'Grams Per Serving' : 'Serving Size'}
+            </label>
             <input 
               type="number"
               value={servingSize}
               onChange={(e) => setServingSize(parseFloat(e.target.value) || 0)}
               className="w-full p-2 border border-border-subtle rounded-lg text-center font-bold bg-card text-text-main"
             />
+            {isServingUnit && (
+              <p className="mt-1 text-[11px] text-text-muted">
+                Used when selecting Serving while adding this food to a meal.
+              </p>
+            )}
           </div>
           <div className="flex-1">
             <label className="block text-[10px] font-bold text-text-muted uppercase mb-1 ml-1">Unit</label>

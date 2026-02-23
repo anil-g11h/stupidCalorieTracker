@@ -14,6 +14,7 @@ import { db } from '../../lib/db';
 import { generateId } from '../../lib';
 import { useStackNavigation } from '../../lib/useStackNavigation';
 import { syncWorkoutExerciseThumbnailPaths } from '../../lib/workoutMedia';
+import RouteHeader from '../../lib/components/RouteHeader';
 
 type WorkoutMediaEntry = {
   sourceId: string;
@@ -351,18 +352,22 @@ export default function WorkoutList() {
   };
 
   return (
-    <div className="pt-4 px-4 max-w-md mx-auto">
-      <header className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-text-main">Workouts</h1>
-        <Link
-          to="/workouts/start"
-          className="h-10 w-10 rounded-full bg-brand text-white text-2xl font-semibold leading-none flex items-center justify-center hover:bg-brand-dark transition-colors shadow-sm"
-          aria-label="Start workout options"
-          title="Start workout options"
-        >
-          +
-        </Link>
-      </header>
+    <div className="bg-page">
+      <RouteHeader
+        title="Workouts"
+        rightAction={
+          <Link
+            to="/workouts/start"
+            className="h-10 w-10 rounded-full bg-brand text-white text-2xl font-semibold leading-none flex items-center justify-center hover:bg-brand-dark transition-colors shadow-sm"
+            aria-label="Start workout options"
+            title="Start workout options"
+          >
+            +
+          </Link>
+        }
+      />
+
+      <div className="pt-4 px-4 max-w-md mx-auto">
 
       {/* Conditional Rendering */}
       {!workouts ? (
@@ -552,6 +557,7 @@ export default function WorkoutList() {
           ))}
         </div>
       )}
+      </div>
     </div>
   );
 }
