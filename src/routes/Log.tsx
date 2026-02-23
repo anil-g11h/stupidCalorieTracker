@@ -8,7 +8,7 @@ import {
   ChartLineUpIcon as AnalyticsIcon
 } from '@phosphor-icons/react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { db, type DailyLog, type Food } from '../lib/db';
+import { db, type BodyMetric, type DailyLog, type Food, type Profile } from '../lib/db';
 import { analyzeEaaRatio } from '../lib/eaa';
 import RouteHeader from '../lib/components/RouteHeader';
 
@@ -19,6 +19,39 @@ const WEIGHT_BASED_REGEX = /^(g|ml|oz)$/i;
 const FIBER_KEY_REGEX = /^fibre$|^fiber$|^dietary[_\s-]*fiber$/i;
 
 type MacroTabKey = 'protein' | 'carbs' | 'fat' | 'fiber';
+type AminoTrackingMode = 'who' | 'hypertrophy';
+
+interface WhoAminoTarget {
+  key: string;
+  label: string;
+  mgPerKgDay: number;
+  aliases: string[];
+}
+
+const WHO_AMINO_TARGETS: WhoAminoTarget[] = [
+  { key: 'histidine10', label: 'Histidine', mgPerKgDay: 10, aliases: ['histidine', 'l-histidine'] },
+  { key: 'isoleucine20', label: 'Isoleucine', mgPerKgDay: 20, aliases: ['isoleucine', 'l-isoleucine'] },
+  { key: 'leucine39', label: 'Leucine', mgPerKgDay: 39, aliases: ['leucine', 'l-leucine', 'leu'] },
+  { key: 'lysine30', label: 'Lysine', mgPerKgDay: 30, aliases: ['lysine', 'l-lysine', 'lys'] },
+  {
+    key: 'methionine_cysteine15',
+    label: 'Methionine + Cysteine',
+    mgPerKgDay: 15,
+    aliases: ['methionine', 'l-methionine', 'cysteine', 'l-cysteine']
+  },
+  {
+    key: 'phenylalanine_tyrosine25',
+    label: 'Phenylalanine + Tyrosine',
+    mgPerKgDay: 25,
+    aliases: ['phenylalanine', 'l-phenylalanine', 'tyrosine', 'l-tyrosine']
+  },
+  { key: 'threonine15', label: 'Threonine', mgPerKgDay: 15, aliases: ['threonine', 'l-threonine'] },
+  { key: 'tryptophan4', label: 'Tryptophan', mgPerKgDay: 4, aliases: ['tryptophan', 'l-tryptophan'] },
+  { key: 'valine26', label: 'Valine', mgPerKgDay: 26, aliases: ['valine', 'l-valine'] }
+];
+
+const HYPERTROPHY_MEAL_LEUCINE_TARGET = 3;
+const HYPERTROPHY_MEAL_EAA_TARGET = 12;
 
 type MealTargetMode = 'percent' | 'calories';
 
@@ -217,6 +250,10 @@ function normalizeKey(value: string): string {
   return value.trim().toLowerCase();
 }
 
+function normalizeAminoKey(value: string): string {
+  return value.trim().toLowerCase().replace(/[_\s-]+/g, '');
+}
+
 function normalizeServingUnitLabel(value: unknown): string {
   const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
   if (!normalized) return 'gram';
@@ -256,6 +293,59 @@ function buildNormalizedMicrosMap(microsConsumed: Record<string, number>): Recor
 
 function getNutrientConsumed(normalizedMicros: Record<string, number>, aliases: string[]): number {
   return aliases.reduce((sum, alias) => sum + (normalizedMicros[normalizeKey(alias)] || 0), 0);
+}
+
+function getMetricCreatedAtTime(value: BodyMetric['created_at']): number {
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === 'string') {
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+}
+
+function toKg(value: number, unit: string): number {
+  if (!Number.isFinite(value)) return 0;
+  const normalizedUnit = normalizeKey(unit || '');
+  if (!normalizedUnit || normalizedUnit === 'kg' || normalizedUnit === 'kgs' || normalizedUnit === 'kilogram' || normalizedUnit === 'kilograms') {
+    return value;
+  }
+  if (normalizedUnit === 'lb' || normalizedUnit === 'lbs' || normalizedUnit === 'pound' || normalizedUnit === 'pounds') {
+    return value / 2.20462;
+  }
+  if (normalizedUnit === 'g' || normalizedUnit === 'gram' || normalizedUnit === 'grams') {
+    return value / 1000;
+  }
+  return value;
+}
+
+function getAminoGramsFromMicros(
+  micros: Record<string, number> | undefined,
+  aliases: string[],
+  amountConsumed: number
+): number {
+  if (!micros || !Number.isFinite(amountConsumed) || amountConsumed <= 0) return 0;
+
+  const aliasSet = new Set(aliases.map(normalizeAminoKey));
+
+  return Object.entries(micros).reduce((sum, [key, value]) => {
+    if (!aliasSet.has(normalizeAminoKey(key))) return sum;
+    const grams = (Number(value) || 0) * amountConsumed;
+    if (grams <= 0) return sum;
+    return sum + grams;
+  }, 0);
+}
+
+function getLogLeucineGrams(log: ExtendedLog): number {
+  const leucineAliases = WHO_AMINO_TARGETS.find((item) => item.key === 'leucine39')?.aliases ?? ['leucine', 'l-leucine', 'leu'];
+  return getAminoGramsFromMicros(log.food?.micros, leucineAliases, Number(log.amount_consumed) || 0);
+}
+
+function getLogTotalEaaGrams(log: ExtendedLog): number {
+  const amountConsumed = Number(log.amount_consumed) || 0;
+  return WHO_AMINO_TARGETS.reduce((sum, aminoTarget) => {
+    return sum + getAminoGramsFromMicros(log.food?.micros, aminoTarget.aliases, amountConsumed);
+  }, 0);
 }
 
 function parseTrackerSettings(raw: unknown): TrackerSettings | null {
@@ -415,7 +505,6 @@ function circularMinuteDistance(a: number, b: number): number {
 export default function DailyLogPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [settings, setSettings] = useState<TrackerSettings | null>(() => readSettingsFromLocalStorage());
-  const [showMicronutrients, setShowMicronutrients] = useState(false);
   const [activeMacroTab, setActiveMacroTab] = useState<MacroTabKey>('protein');
   const [timeTick, setTimeTick] = useState(() => Date.now());
   const [openActionsLogId, setOpenActionsLogId] = useState<string | null>(null);
@@ -525,6 +614,46 @@ export default function DailyLogPage() {
 
     return { daysLogs, foodsMap, settingsRow };
   }, [date]);
+
+  const currentUserId = useMemo(() => {
+    const fromLogs = data?.daysLogs.find((log) => typeof log.user_id === 'string' && log.user_id.trim())?.user_id?.trim();
+    return fromLogs || 'local-user';
+  }, [data]);
+
+  const profileRow = useLiveQuery(
+    async () => {
+      if (!currentUserId) return undefined;
+      return db.profiles.get(currentUserId);
+    },
+    [currentUserId],
+    undefined as Profile | undefined
+  );
+
+  const aminoMode: AminoTrackingMode = profileRow?.goal_focus === 'muscle_gain' ? 'hypertrophy' : 'who';
+
+  const latestWeightMetric = useLiveQuery(
+    async () => {
+      const list = await db.metrics
+        .where('type')
+        .equals('weight')
+        .and((metric) => metric.user_id === currentUserId && metric.date <= date)
+        .toArray();
+
+      if (!list.length) return null;
+
+      return list.sort((a, b) => {
+        if (a.date !== b.date) return a.date > b.date ? -1 : 1;
+        return getMetricCreatedAtTime(b.created_at) - getMetricCreatedAtTime(a.created_at);
+      })[0];
+    },
+    [currentUserId, date],
+    null as BodyMetric | null
+  );
+
+  const latestWeightKg = useMemo(() => {
+    if (!latestWeightMetric) return 0;
+    return toKg(Number(latestWeightMetric.value) || 0, latestWeightMetric.unit || 'kg');
+  }, [latestWeightMetric]);
 
   const baseGoals = {
     calories: Number((data as any)?.settingsRow?.nutrition?.calorieBudget) || 2000,
@@ -817,6 +946,73 @@ export default function DailyLogPage() {
     return [...configuredSections, ...legacySections];
   }, [extendedLogs, mealDefinitions, goals.calories]);
 
+  const loggedMealSections = useMemo(() => mealSections.filter((meal) => meal.logs.length > 0), [mealSections]);
+  const mealCountForTargets = Math.max(1, loggedMealSections.length);
+
+  const whoDailyLeucineTarget = latestWeightKg > 0
+    ? (latestWeightKg * (WHO_AMINO_TARGETS.find((item) => item.key === 'leucine39')?.mgPerKgDay || 0)) / 1000
+    : 0;
+  const whoDailyEaaTarget = latestWeightKg > 0
+    ? (latestWeightKg * WHO_AMINO_TARGETS.reduce((sum, item) => sum + item.mgPerKgDay, 0)) / 1000
+    : 0;
+
+  const perMealLeucineTarget = aminoMode === 'who'
+    ? (latestWeightKg > 0 ? whoDailyLeucineTarget / mealCountForTargets : 0)
+    : HYPERTROPHY_MEAL_LEUCINE_TARGET;
+
+  const perMealEaaTarget = aminoMode === 'who'
+    ? (latestWeightKg > 0 ? whoDailyEaaTarget / mealCountForTargets : 0)
+    : HYPERTROPHY_MEAL_EAA_TARGET;
+
+  const perMealAminoTracking = useMemo(
+    () =>
+      loggedMealSections.map((meal) => {
+        const leucineIntake = meal.logs.reduce((sum, log) => sum + getLogLeucineGrams(log), 0);
+        const eaaIntake = meal.logs.reduce((sum, log) => sum + getLogTotalEaaGrams(log), 0);
+
+        return {
+          id: meal.id,
+          label: meal.label,
+          leucineIntake,
+          eaaIntake,
+          leucineHit: perMealLeucineTarget > 0 ? leucineIntake >= perMealLeucineTarget : false,
+          eaaHit: perMealEaaTarget > 0 ? eaaIntake >= perMealEaaTarget : false
+        };
+      }),
+    [loggedMealSections, perMealLeucineTarget, perMealEaaTarget]
+  );
+
+  const perMealAminoByMealId = useMemo(
+    () =>
+      perMealAminoTracking.reduce<Record<string, (typeof perMealAminoTracking)[number]>>((acc, item) => {
+        acc[item.id] = item;
+        return acc;
+      }, {}),
+    [perMealAminoTracking]
+  );
+
+  const proteinGoal = Math.max(goals.protein, 1);
+  const proteinProgress = Math.min((analytics.totals.protein / proteinGoal) * 100, 100);
+
+  const leucineSegment = Math.min(Math.max(analytics.eaa.groups.leucine, 0), proteinGoal);
+  const eaaMinusLeucineSegment = Math.min(
+    Math.max(analytics.eaa.eaaTotal - analytics.eaa.groups.leucine, 0),
+    Math.max(proteinGoal - leucineSegment, 0)
+  );
+  const proteinMinusEaaSegment = Math.min(
+    Math.max(analytics.totals.protein - analytics.eaa.eaaTotal, 0),
+    Math.max(proteinGoal - leucineSegment - eaaMinusLeucineSegment, 0)
+  );
+  const proteinRemainingSegment = Math.max(
+    proteinGoal - leucineSegment - eaaMinusLeucineSegment - proteinMinusEaaSegment,
+    0
+  );
+
+  const leucineSegmentPct = (leucineSegment / proteinGoal) * 100;
+  const eaaMinusLeucineSegmentPct = (eaaMinusLeucineSegment / proteinGoal) * 100;
+  const proteinMinusEaaSegmentPct = (proteinMinusEaaSegment / proteinGoal) * 100;
+  const proteinRemainingSegmentPct = (proteinRemainingSegment / proteinGoal) * 100;
+
   const highlightedMealId = useMemo(() => {
     if (!isToday) return null;
 
@@ -981,16 +1177,46 @@ export default function DailyLogPage() {
 
           {showAnalytics && (
             <div className="mt-3 space-y-3">
-              <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="bg-card rounded-xl p-3 border border-border-subtle space-y-2">
+                <div className="flex items-baseline justify-between gap-2">
+                  <p className="text-xs font-semibold text-text-main">Protein</p>
+                  <p className="text-xs text-text-muted font-medium">
+                    {Math.round(analytics.totals.protein * 10) / 10}g/{Math.round(goals.protein * 10) / 10}g
+                  </p>
+                </div>
+
+                <div className="h-2 rounded-full border border-border-subtle overflow-hidden flex">
+                  <div
+                    className="bg-macro-protein h-full"
+                    style={{ width: `${leucineSegmentPct}%` }}
+                    title={`Leucine ${Math.round(leucineSegment * 100) / 100}g`}
+                  />
+                  <div
+                    className="bg-macro-protein/70 h-full"
+                    style={{ width: `${eaaMinusLeucineSegmentPct}%` }}
+                    title={`EAA - Leucine ${Math.round(eaaMinusLeucineSegment * 100) / 100}g`}
+                  />
+                  <div
+                    className="bg-macro-protein/35 h-full"
+                    style={{ width: `${proteinMinusEaaSegmentPct}%` }}
+                    title={`Protein - EAA ${Math.round(proteinMinusEaaSegment * 100) / 100}g`}
+                  />
+                  <div
+                    className="bg-surface h-full"
+                    style={{ width: `${proteinRemainingSegmentPct}%` }}
+                    title={`Remaining ${Math.round(proteinRemainingSegment * 100) / 100}g`}
+                  />
+                </div>
+
+                <div className="flex items-center gap-2 text-[11px]">
+                  <p className="text-text-muted">Leucine: {Math.round(analytics.eaa.groups.leucine * 100) / 100}g</p>
+                  <span className="text-text-muted">•</span>
+                  <p className="text-text-muted">EAA: {Math.round(analytics.eaa.eaaTotal * 100) / 100}g</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 text-xs">
                 {[
-                  {
-                    key: 'protein',
-                    label: 'Protein',
-                    total: analytics.totals.protein,
-                    goal: goals.protein,
-                    remaining: analytics.remaining.protein,
-                    barClass: 'bg-macro-protein'
-                  },
                   {
                     key: 'carbs',
                     label: 'Carbs',
@@ -1019,18 +1245,18 @@ export default function DailyLogPage() {
                   const progress = Math.min((item.total / Math.max(item.goal, 1)) * 100, 100);
 
                   return (
-                    <div key={item.key} className="bg-surface rounded-xl p-3 border border-border-subtle">
-                      <div className="flex items-baseline justify-between gap-2">
-                        <p className="text-text-muted font-medium">{item.label}</p>
-                        <p className="text-[11px] text-text-muted">{Math.round(progress)}%</p>
+                    <div key={item.key} className="bg-surface rounded-xl p-2.5 border border-border-subtle">
+                      <div className="flex items-baseline justify-between gap-1">
+                        <p className="text-text-muted font-medium text-[11px]">{item.label}</p>
+                        <p className="text-[10px] text-text-muted">{Math.round(progress)}%</p>
                       </div>
-                      <p className="font-bold text-text-main mt-1">
-                        {Math.round(item.total)}g <span className="text-text-muted font-medium">/ {Math.round(item.goal)}g</span>
+                      <p className="font-bold text-text-main mt-0.5 text-[13px]">
+                        {Math.round(item.total)}g <span className="text-text-muted font-medium text-[10px]">/ {Math.round(item.goal)}g</span>
                       </p>
-                      <div className="mt-2 h-1.5 rounded-full bg-card border border-border-subtle overflow-hidden">
+                      <div className="mt-1.5 h-1.5 rounded-full bg-card border border-border-subtle overflow-hidden">
                         <div className={`${item.barClass} h-full rounded-full`} style={{ width: `${progress}%` }} />
                       </div>
-                      <p className="text-text-muted mt-2">Need {Math.round(item.remaining)}g</p>
+                      <p className="text-text-muted mt-1 text-[10px]">Need {Math.round(item.remaining)}g</p>
                     </div>
                   );
                 })}
@@ -1089,142 +1315,48 @@ export default function DailyLogPage() {
                 )}
               </div>
 
-              <div className="bg-surface rounded-xl p-3 border border-border-subtle space-y-3">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs font-semibold text-text-main">EAA Quality (4:2:2:2)</p>
-                  <span className="text-[11px] text-text-muted font-medium">Leu : Lys : Val+Iso : Rest</span>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2 text-xs">
-                  <div className="bg-card rounded-lg border border-border-subtle px-2.5 py-2">
-                    <p className="text-text-muted">Protein eaten</p>
-                    <p className="font-bold text-text-main mt-0.5">{Math.round(analytics.eaa.proteinTotal)}g</p>
-                  </div>
-                  <div className="bg-card rounded-lg border border-border-subtle px-2.5 py-2">
-                    <p className="text-text-muted">EAA tracked</p>
-                    <p className="font-bold text-text-main mt-0.5">{Math.round(analytics.eaa.eaaTotal * 10) / 10}g</p>
-                  </div>
-                  <div className="bg-card rounded-lg border border-border-subtle px-2.5 py-2">
-                    <p className="text-text-muted">EAA / Protein</p>
-                    <p className="font-bold text-text-main mt-0.5">{Math.round(analytics.eaa.eaaAsProteinPercent)}%</p>
-                  </div>
-                </div>
-
-                <div className="text-[11px] text-text-muted">
-                  Coverage: {Math.round(analytics.eaaCoveragePercent)}% protein has amino profile ({Math.round(analytics.eaa.proteinWithEaaData)}g known / {Math.round(analytics.eaa.proteinMissingEaaData)}g unknown)
-                </div>
-
-                <div className="space-y-2">
-                  {[
-                    { key: 'leucine', label: 'Leucine (4)', barClass: 'bg-brand' },
-                    { key: 'lysine', label: 'Lysine (2)', barClass: 'bg-macro-protein' },
-                    { key: 'valineIsoleucine', label: 'Valine + Isoleucine (2)', barClass: 'bg-macro-carbs' },
-                    { key: 'rest', label: 'Rest EAAs (2)', barClass: 'bg-macro-fat' }
-                  ].map((item) => {
-                    const actual = analytics.eaa.groups[item.key as 'leucine' | 'lysine' | 'valineIsoleucine' | 'rest'];
-                    const target = analytics.eaa.targetByCurrentTotal[item.key as 'leucine' | 'lysine' | 'valineIsoleucine' | 'rest'];
-                    const deficit = analytics.eaa.deficitByGroup[item.key as 'leucine' | 'lysine' | 'valineIsoleucine' | 'rest'];
-                    const progress = Math.min((actual / Math.max(target, 0.0001)) * 100, 100);
-
-                    return (
-                      <div key={item.key} className="bg-card rounded-lg border border-border-subtle px-2.5 py-2">
+              <div className="space-y-3">
+                <div className="bg-card border border-border-subtle rounded-xl px-2.5 py-2">
+                  <p className="text-xs font-semibold text-text-main">Essential Vitamins</p>
+                  <p className="text-[11px] text-text-muted">Vitamins are critical for immune resilience and converting food into cellular fuel.</p>
+                  <p className="text-[11px] text-text-muted mt-0.5">RDA for Men (Age 30)</p>
+                  <div className="mt-2 space-y-2">
+                    {micronutrientTracking.vitamins.map((item) => (
+                      <div key={item.key} className="bg-surface border border-border-subtle rounded-lg px-2 py-2">
                         <div className="flex items-center justify-between gap-2">
-                          <p className="text-xs text-text-main font-medium">{item.label}</p>
-                          <p className="text-[11px] text-text-muted">{Math.round(progress)}%</p>
+                          <p className="text-xs font-medium text-text-main">{item.label}</p>
+                          <p className="text-[11px] text-text-muted">{formatNutrientAmount(item.consumed, item.unit)} / {item.targetLabel}</p>
                         </div>
-                        <p className="text-xs text-text-muted mt-0.5">
-                          {Math.round(actual * 100) / 100}g / target {Math.round(target * 100) / 100}g
-                        </p>
-                        <div className="mt-1.5 h-1.5 rounded-full bg-surface border border-border-subtle overflow-hidden">
-                          <div className={`${item.barClass} h-full rounded-full`} style={{ width: `${progress}%` }} />
+                        <div className="mt-1 h-1.5 rounded-full bg-card border border-border-subtle overflow-hidden">
+                          <div className="bg-brand h-full rounded-full" style={{ width: `${item.progress}%` }} />
                         </div>
-                        <p className="text-[11px] text-text-muted mt-1">
-                          {deficit > 0 ? `Need ${Math.round(deficit * 100) / 100}g` : 'On ratio'}
-                        </p>
+                        <p className="text-[11px] text-text-muted mt-1">{item.functionText}</p>
+                        <p className="text-[11px] text-text-muted">{item.status}</p>
                       </div>
-                    );
-                  })}
-                </div>
-
-                {(() => {
-                  const deficits = [
-                    { key: 'Leucine', value: analytics.eaa.deficitByGroup.leucine },
-                    { key: 'Lysine', value: analytics.eaa.deficitByGroup.lysine },
-                    { key: 'Valine + Isoleucine', value: analytics.eaa.deficitByGroup.valineIsoleucine },
-                    { key: 'Rest EAAs', value: analytics.eaa.deficitByGroup.rest }
-                  ].sort((a, b) => b.value - a.value);
-
-                  if (deficits[0].value <= 0) {
-                    return <p className="text-[11px] font-medium text-brand">Great balance: your EAA groups align with 4:2:2:2.</p>;
-                  }
-
-                  return (
-                    <p className="text-[11px] text-text-muted">
-                      Most lacking: <span className="font-semibold text-text-main">{deficits[0].key}</span> (need {Math.round(deficits[0].value * 100) / 100}g)
-                    </p>
-                  );
-                })()}
-              </div>
-
-              <div className="bg-surface rounded-xl p-3 border border-border-subtle">
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <p className="text-xs font-semibold text-text-main">Micronutrients tracked</p>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] text-text-muted font-medium">{micronutrientTracking.trackedCount}/14 tracked</span>
-                    <button
-                      type="button"
-                      onClick={() => setShowMicronutrients((prev) => !prev)}
-                      className="text-[11px] font-semibold text-brand hover:text-text-main transition-colors"
-                    >
-                      {showMicronutrients ? 'Hide' : 'Show'}
-                    </button>
+                    ))}
                   </div>
                 </div>
-                {!showMicronutrients ? null : (
-                  <div className="space-y-3">
-                    <div className="bg-card border border-border-subtle rounded-lg px-2.5 py-2">
-                      <p className="text-xs font-semibold text-text-main">Essential Vitamins</p>
-                      <p className="text-[11px] text-text-muted">Vitamins are critical for immune resilience and converting food into cellular fuel.</p>
-                      <p className="text-[11px] text-text-muted mt-0.5">RDA for Men (Age 30)</p>
-                      <div className="mt-2 space-y-2">
-                        {micronutrientTracking.vitamins.map((item) => (
-                          <div key={item.key} className="bg-surface border border-border-subtle rounded-lg px-2 py-2">
-                            <div className="flex items-center justify-between gap-2">
-                              <p className="text-xs font-medium text-text-main">{item.label}</p>
-                              <p className="text-[11px] text-text-muted">{formatNutrientAmount(item.consumed, item.unit)} / {item.targetLabel}</p>
-                            </div>
-                            <div className="mt-1 h-1.5 rounded-full bg-card border border-border-subtle overflow-hidden">
-                              <div className="bg-brand h-full rounded-full" style={{ width: `${item.progress}%` }} />
-                            </div>
-                            <p className="text-[11px] text-text-muted mt-1">{item.functionText}</p>
-                            <p className="text-[11px] text-text-muted">{item.status}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
 
-                    <div className="bg-card border border-border-subtle rounded-lg px-2.5 py-2">
-                      <p className="text-xs font-semibold text-text-main">Essential Minerals</p>
-                      <p className="text-[11px] text-text-muted">Minerals are categorized into macrominerals and trace minerals.</p>
-                      <p className="text-[11px] text-text-muted mt-0.5">RDA for Men (Age 30)</p>
-                      <div className="mt-2 space-y-2">
-                        {micronutrientTracking.minerals.map((item) => (
-                          <div key={item.key} className="bg-surface border border-border-subtle rounded-lg px-2 py-2">
-                            <div className="flex items-center justify-between gap-2">
-                              <p className="text-xs font-medium text-text-main">{item.label}</p>
-                              <p className="text-[11px] text-text-muted">{formatNutrientAmount(item.consumed, item.unit)} / {item.targetLabel}</p>
-                            </div>
-                            <div className="mt-1 h-1.5 rounded-full bg-card border border-border-subtle overflow-hidden">
-                              <div className="bg-brand h-full rounded-full" style={{ width: `${item.progress}%` }} />
-                            </div>
-                            <p className="text-[11px] text-text-muted mt-1">{item.functionText}</p>
-                            <p className="text-[11px] text-text-muted">{item.status}</p>
-                          </div>
-                        ))}
+                <div className="bg-card border border-border-subtle rounded-xl px-2.5 py-2">
+                  <p className="text-xs font-semibold text-text-main">Essential Minerals</p>
+                  <p className="text-[11px] text-text-muted">Minerals are categorized into macrominerals and trace minerals.</p>
+                  <p className="text-[11px] text-text-muted mt-0.5">RDA for Men (Age 30)</p>
+                  <div className="mt-2 space-y-2">
+                    {micronutrientTracking.minerals.map((item) => (
+                      <div key={item.key} className="bg-surface border border-border-subtle rounded-lg px-2 py-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-xs font-medium text-text-main">{item.label}</p>
+                          <p className="text-[11px] text-text-muted">{formatNutrientAmount(item.consumed, item.unit)} / {item.targetLabel}</p>
+                        </div>
+                        <div className="mt-1 h-1.5 rounded-full bg-card border border-border-subtle overflow-hidden">
+                          <div className="bg-brand h-full rounded-full" style={{ width: `${item.progress}%` }} />
+                        </div>
+                        <p className="text-[11px] text-text-muted mt-1">{item.functionText}</p>
+                        <p className="text-[11px] text-text-muted">{item.status}</p>
                       </div>
-                    </div>
+                    ))}
                   </div>
-                )}
+                </div>
               </div>
             </div>
           )}
@@ -1232,6 +1364,7 @@ export default function DailyLogPage() {
 
         {!isReportView && mealSections.map((meal) => {
           const mealCalories = meal.logs.reduce((sum, log) => sum + log.calories, 0);
+          const mealAmino = perMealAminoByMealId[meal.id];
 
           return (
             <div key={meal.id} className="mb-6">
@@ -1250,6 +1383,39 @@ export default function DailyLogPage() {
                   )}
                 </div>
                 <span className="text-sm text-text-muted font-medium">{mealCalories} kcal</span>
+              </div>
+
+              <div className="mb-3 bg-surface rounded-xl p-2.5 border border-border-subtle">
+                <div className="flex items-center justify-between gap-2 mb-1.5">
+                  <p className="text-[11px] font-semibold text-text-main">Amino target</p>
+                  <span className="text-[11px] font-semibold text-brand">
+                    {aminoMode === 'hypertrophy' ? 'Hypertrophy' : 'WHO'}
+                  </span>
+                </div>
+
+                {mealAmino ? (
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between gap-2 text-[11px]">
+                      <p className="text-text-muted">
+                        Leucine {Math.round(mealAmino.leucineIntake * 100) / 100}g / {Math.round(perMealLeucineTarget * 100) / 100}g
+                      </p>
+                      <span className={`font-semibold ${mealAmino.leucineHit ? 'text-brand' : 'text-text-muted'}`}>
+                        {perMealLeucineTarget > 0 ? (mealAmino.leucineHit ? 'Met' : 'Miss') : 'No target'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2 text-[11px]">
+                      <p className="text-text-muted">
+                        EAA {Math.round(mealAmino.eaaIntake * 100) / 100}g / {Math.round(perMealEaaTarget * 100) / 100}g
+                      </p>
+                      <span className={`font-semibold ${mealAmino.eaaHit ? 'text-brand' : 'text-text-muted'}`}>
+                        {perMealEaaTarget > 0 ? (mealAmino.eaaHit ? 'Met' : 'Miss') : 'No target'}
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-text-muted">No food logged in this meal yet.</p>
+                )}
               </div>
 
               <div className="space-y-3">

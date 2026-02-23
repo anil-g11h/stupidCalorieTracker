@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useSearchParams } from 'react-router-dom';
-import { db, type BodyMetric, type Food, type Profile, type UserSettings } from '../lib/db';
+import { db, type BodyMetric, type Food, type Profile, type UserSettings, type Workout } from '../lib/db';
 import { generateId } from '../lib';
 import { fetchGeminiDailyCoach, type GeminiDailyCoachPayload } from '../lib/gemini';
 import { analyzeEaaRatio } from '../lib/eaa';
@@ -33,6 +33,154 @@ function getWorkoutDurationMinutes(startTime: string, endTime?: string) {
   const end = new Date(endTime).getTime();
   if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return 0;
   return Math.round((end - start) / 60000);
+}
+
+type WorkoutProgressWindow = 'three-month' | 'six-month' | 'yearly';
+
+interface WorkoutProgressBucket {
+  id: string;
+  label: string;
+  value: number;
+}
+
+interface WorkoutProgressChart {
+  window: WorkoutProgressWindow;
+  title: string;
+  subtitle: string;
+  buckets: WorkoutProgressBucket[];
+  maxValue: number;
+}
+
+const WORKOUT_PROGRESS_BAR_COUNT = 10;
+
+function startOfDay(date: Date) {
+  const result = new Date(date);
+  result.setHours(0, 0, 0, 0);
+  return result;
+}
+
+function addDays(date: Date, days: number) {
+  const result = new Date(date);
+  result.setDate(result.getDate() + days);
+  return result;
+}
+
+function addMonths(date: Date, months: number) {
+  const result = new Date(date);
+  result.setMonth(result.getMonth() + months);
+  return result;
+}
+
+function startOfMonth(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function getDaysTracked(workouts: Workout[], now: Date) {
+  const timestamps = workouts
+    .map((workout) => new Date(workout.start_time).getTime())
+    .filter((value) => Number.isFinite(value));
+
+  if (timestamps.length === 0) return 0;
+
+  const earliest = Math.min(...timestamps);
+  const todayStart = startOfDay(now).getTime();
+  const earliestStart = startOfDay(new Date(earliest)).getTime();
+  const spanMs = Math.max(0, todayStart - earliestStart);
+  return Math.floor(spanMs / 86400000) + 1;
+}
+
+function selectWorkoutWindow(daysTracked: number): WorkoutProgressWindow {
+  if (daysTracked < 180) return 'three-month';
+  if (daysTracked < 365) return 'six-month';
+  return 'yearly';
+}
+
+function buildWorkoutProgressChart(workouts: Workout[], now: Date): WorkoutProgressChart {
+  const daysTracked = getDaysTracked(workouts, now);
+  const window = selectWorkoutWindow(daysTracked);
+  const workoutDates = workouts
+    .map((workout) => startOfDay(new Date(workout.start_time)))
+    .filter((value) => Number.isFinite(value.getTime()));
+  const todayStart = startOfDay(now);
+
+  if (window === 'three-month') {
+    const formatter = new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: '2-digit' });
+    const bucketSizeDays = 9;
+    const rangeDays = WORKOUT_PROGRESS_BAR_COUNT * bucketSizeDays;
+    const rangeStart = addDays(todayStart, -(rangeDays - 1));
+    const buckets = Array.from({ length: WORKOUT_PROGRESS_BAR_COUNT }, (_, index) => {
+      const start = addDays(rangeStart, index * bucketSizeDays);
+      const end = addDays(start, bucketSizeDays);
+      const value = workoutDates.filter(
+        (workoutDay) => workoutDay.getTime() >= start.getTime() && workoutDay.getTime() < end.getTime()
+      ).length;
+      return {
+        id: start.toISOString().split('T')[0],
+        label: formatter.format(start),
+        value
+      };
+    });
+
+    return {
+      window,
+      title: '3-month progress',
+      subtitle: 'Workouts per month',
+      buckets,
+      maxValue: Math.max(1, ...buckets.map((bucket) => bucket.value))
+    };
+  }
+
+  if (window === 'six-month') {
+    const formatter = new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: '2-digit' });
+    const bucketSizeDays = 18;
+    const rangeDays = WORKOUT_PROGRESS_BAR_COUNT * bucketSizeDays;
+    const rangeStart = addDays(todayStart, -(rangeDays - 1));
+    const buckets = Array.from({ length: WORKOUT_PROGRESS_BAR_COUNT }, (_, index) => {
+      const start = addDays(rangeStart, index * bucketSizeDays);
+      const end = addDays(start, bucketSizeDays);
+      const value = workoutDates.filter(
+        (workoutDay) => workoutDay.getTime() >= start.getTime() && workoutDay.getTime() < end.getTime()
+      ).length;
+      return {
+        id: start.toISOString().split('T')[0],
+        label: formatter.format(start),
+        value
+      };
+    });
+
+    return {
+      window,
+      title: '6-month progress',
+      subtitle: 'Workouts per period',
+      buckets,
+      maxValue: Math.max(1, ...buckets.map((bucket) => bucket.value))
+    };
+  }
+
+  const formatter = new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: '2-digit' });
+  const bucketSizeDays = 36;
+  const rangeDays = WORKOUT_PROGRESS_BAR_COUNT * bucketSizeDays;
+  const rangeStart = addDays(todayStart, -(rangeDays - 1));
+  const buckets = Array.from({ length: WORKOUT_PROGRESS_BAR_COUNT }, (_, index) => {
+    const start = addDays(rangeStart, index * bucketSizeDays);
+    const end = addDays(start, bucketSizeDays);
+    const value = workoutDates.filter(
+      (workoutDay) => workoutDay.getTime() >= start.getTime() && workoutDay.getTime() < end.getTime()
+    ).length;
+    return {
+      id: start.toISOString().split('T')[0],
+      label: formatter.format(start),
+      value
+    };
+  });
+
+  return {
+    window,
+    title: 'Yearly progress',
+    subtitle: 'Workouts per period',
+    buckets,
+    maxValue: Math.max(1, ...buckets.map((bucket) => bucket.value))
+  };
 }
 
 function toKg(value: number, unit: string) {
@@ -241,12 +389,38 @@ export default function Home() {
       foodsMap,
       todayLogsCount: todayLogs.length,
       calorieTotals,
+      workouts,
       workoutsCount: workouts.length,
       todayWorkoutCount,
       thisWeekWorkoutsCount: thisWeekWorkouts.length,
       thisWeekMinutes
     };
   }, [today, weekStartIso, currentUserId]);
+
+  const workoutProgressChart = useMemo(() => buildWorkoutProgressChart(data?.workouts ?? [], now), [data?.workouts, today]);
+  const hasWorkoutProgressValues = useMemo(
+    () => workoutProgressChart.buckets.some((bucket) => bucket.value > 0),
+    [workoutProgressChart]
+  );
+  const workoutPeriodSummary = useMemo(() => {
+    const workouts = data?.workouts ?? [];
+    const nowStartMs = startOfDay(now).getTime();
+    const last7DaysStartMs = addDays(startOfDay(now), -6).getTime();
+    const threeMonthStartMs = addMonths(startOfMonth(now), -2).getTime();
+    const sixMonthStartMs = addMonths(startOfMonth(now), -5).getTime();
+    const yearStartMs = addMonths(startOfMonth(now), -11).getTime();
+
+    const timestamps = workouts
+      .map((workout) => new Date(workout.start_time).getTime())
+      .filter((value) => Number.isFinite(value));
+
+    return {
+      week: timestamps.filter((value) => value >= last7DaysStartMs && value <= nowStartMs + 86400000).length,
+      threeMonth: timestamps.filter((value) => value >= threeMonthStartMs && value <= nowStartMs + 86400000).length,
+      sixMonth: timestamps.filter((value) => value >= sixMonthStartMs && value <= nowStartMs + 86400000).length,
+      year: timestamps.filter((value) => value >= yearStartMs && value <= nowStartMs + 86400000).length
+    };
+  }, [data?.workouts, today]);
 
   const calorieGoal = data?.settings?.nutrition?.calorieBudget ?? 2000;
   const proteinGoal =
@@ -1192,12 +1366,10 @@ export default function Home() {
           onClick={() => push('/log')}
           className="block w-full bg-card rounded-2xl p-6 border border-border-subtle shadow-sm hover:border-brand-light transition-all active:scale-[0.99]"
         >
-          <p className="mt-2 text-3xl font-extrabold text-text-main">
-            {caloriesConsumed} of {Math.round(calorieGoal)}{' '}
+          <p className="mt-2 text-3xl text-text-main leading-tight whitespace-nowrap">
+            <span className="font-extrabold">{caloriesConsumed}</span>
+            <span className="text-text-muted font-normal"> / {Math.round(calorieGoal)}</span>{' '}
             <span className="text-sm font-semibold text-text-muted align-middle">Calories Eaten</span>
-            <span className="ml-2 text-xs font-bold text-brand bg-surface px-2.5 py-1 rounded-full align-middle">
-              {data?.todayLogsCount ?? 0} logs
-            </span>
           </p>
 
           <div className="mt-3 h-4 bg-surface rounded-full overflow-hidden shadow-inner">
@@ -1248,22 +1420,22 @@ export default function Home() {
           onClick={() => push('/workouts')}
           className="block w-full bg-card rounded-2xl p-5 border border-border-subtle shadow-sm hover:border-brand-light transition-all active:scale-[0.99]"
         >
-          <p className="text-sm font-bold uppercase tracking-wide text-text-muted">Workout</p>
-          <div className="mt-3 grid grid-cols-3 gap-3">
-            <div className="bg-surface rounded-xl p-2.5 text-center">
-              <p className="text-2xl font-extrabold text-text-main">{data?.todayWorkoutCount ?? 0}</p>
-              <p className="text-[11px] text-text-muted">Today</p>
+          <p className="text-xs text-text-muted">{workoutPeriodSummary.week} workouts in last 7 days</p>
+          {hasWorkoutProgressValues ? (
+            <div className="mt-3 flex h-24 items-end gap-1.5">
+              {workoutProgressChart.buckets.map((bucket) => {
+                const heightPercent = bucket.value > 0 ? Math.max(8, (bucket.value / workoutProgressChart.maxValue) * 100) : 0;
+                return (
+                  <div key={bucket.id} className="flex min-w-0 flex-1 flex-col items-center gap-1">
+                    <div className="flex h-20 w-full items-end">
+                      {bucket.value > 0 ? <div className="w-full rounded-t-md bg-brand" style={{ height: `${heightPercent}%` }} /> : null}
+                    </div>
+                    <p className="truncate text-[10px] text-text-muted">{bucket.label}</p>
+                  </div>
+                );
+              })}
             </div>
-            <div className="bg-surface rounded-xl p-2.5 text-center">
-              <p className="text-2xl font-extrabold text-text-main">{data?.thisWeekWorkoutsCount ?? 0}</p>
-              <p className="text-[11px] text-text-muted">This week</p>
-            </div>
-            <div className="bg-surface rounded-xl p-2.5 text-center">
-              <p className="text-2xl font-extrabold text-text-main">{data?.thisWeekMinutes ?? 0}</p>
-              <p className="text-[11px] text-text-muted">Week mins</p>
-            </div>
-          </div>
-          <p className="mt-3 text-xs font-medium text-text-muted">Total workouts logged: {data?.workoutsCount ?? 0}</p>
+          ) : null}
         </button>
 
         <section className="bg-card rounded-2xl p-5 border border-border-subtle shadow-sm">
