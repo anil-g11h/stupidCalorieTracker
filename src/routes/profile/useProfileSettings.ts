@@ -52,6 +52,61 @@ interface LocalSettingsRow {
 const SETTINGS_STORAGE_KEY = 'stupid_tracker_settings_v1';
 const SETTINGS_ID: LocalSettingsRow['id'] = 'local-settings';
 export const REMINDER_KEYS: ReminderKey[] = ['food', 'water', 'workout', 'walk', 'weight', 'medicine'];
+const CANONICAL_MEAL_IDS = new Set(['breakfast', 'lunch', 'dinner', 'snack', 'supplement']);
+
+const canonicalMealIdFromName = (name: string): string | null => {
+  const normalized = name.trim().toLowerCase();
+  if (!normalized) return null;
+
+  if (normalized.includes('break')) return 'breakfast';
+  if (normalized.includes('lunch')) return 'lunch';
+  if (normalized.includes('dinner') || normalized.includes('supper')) return 'dinner';
+  if (normalized.includes('snack')) return 'snack';
+  if (normalized.includes('supplement') || normalized.includes('vitamin')) return 'supplement';
+
+  return null;
+};
+
+const normalizeMealId = (
+  meal: Partial<MealSetting>,
+  index: number,
+  usedCanonicalMealIds: Set<string>
+): string => {
+  const rawId = typeof meal.id === 'string' ? meal.id.trim().toLowerCase() : '';
+  if (rawId) {
+    if (!CANONICAL_MEAL_IDS.has(rawId)) return rawId;
+    if (!usedCanonicalMealIds.has(rawId)) {
+      usedCanonicalMealIds.add(rawId);
+      return rawId;
+    }
+  }
+
+  const canonicalFromName = canonicalMealIdFromName(typeof meal.name === 'string' ? meal.name : '');
+  if (canonicalFromName && !usedCanonicalMealIds.has(canonicalFromName)) {
+    usedCanonicalMealIds.add(canonicalFromName);
+    return canonicalFromName;
+  }
+
+  if (index === 0 && !usedCanonicalMealIds.has('breakfast')) {
+    usedCanonicalMealIds.add('breakfast');
+    return 'breakfast';
+  }
+  if (index === 1 && !usedCanonicalMealIds.has('lunch')) {
+    usedCanonicalMealIds.add('lunch');
+    return 'lunch';
+  }
+  if (index === 2 && !usedCanonicalMealIds.has('dinner')) {
+    usedCanonicalMealIds.add('dinner');
+    return 'dinner';
+  }
+  if (index === 3 && !usedCanonicalMealIds.has('snack')) {
+    usedCanonicalMealIds.add('snack');
+    return 'snack';
+  }
+
+  return rawId || generateId();
+};
+
 const createDefaultSettings = (): LocalSettingsRow => ({
   id: SETTINGS_ID,
   nutrition: {
@@ -68,10 +123,10 @@ const createDefaultSettings = (): LocalSettingsRow => ({
     weightTarget: 0
   },
   meals: [
-    { id: generateId(), name: 'Breakfast', time: '08:00', targetMode: 'percent', targetValue: 25 },
-    { id: generateId(), name: 'Lunch', time: '13:00', targetMode: 'percent', targetValue: 35 },
-    { id: generateId(), name: 'Dinner', time: '19:00', targetMode: 'percent', targetValue: 30 },
-    { id: generateId(), name: 'Snack', time: '16:00', targetMode: 'percent', targetValue: 10 }
+    { id: 'breakfast', name: 'Breakfast', time: '08:00', targetMode: 'percent', targetValue: 25 },
+    { id: 'lunch', name: 'Lunch', time: '13:00', targetMode: 'percent', targetValue: 35 },
+    { id: 'dinner', name: 'Dinner', time: '19:00', targetMode: 'percent', targetValue: 30 },
+    { id: 'snack', name: 'Snack', time: '16:00', targetMode: 'percent', targetValue: 10 }
   ],
   reminders: {
     food: { enabled: true, time: '08:00' },
@@ -95,6 +150,7 @@ const normalizeSettings = (input: Partial<LocalSettingsRow> | null | undefined):
   const defaults = createDefaultSettings();
   const nutrition = input?.nutrition ?? defaults.nutrition;
   const remindersInput = input?.reminders ?? defaults.reminders;
+  const usedCanonicalMealIds = new Set<string>();
 
   const reminders = REMINDER_KEYS.reduce((acc, key) => {
     const item = remindersInput[key] ?? defaults.reminders[key];
@@ -106,7 +162,7 @@ const normalizeSettings = (input: Partial<LocalSettingsRow> | null | undefined):
   }, {} as Record<ReminderKey, ReminderSetting>);
 
   const meals: MealSetting[] = (input?.meals ?? defaults.meals).map((meal, index) => ({
-    id: meal.id || generateId(),
+    id: normalizeMealId(meal, index, usedCanonicalMealIds),
     name: (meal.name || `Meal ${index + 1}`).trim(),
     time: meal.time || '12:00',
     targetMode: meal.targetMode === 'calories' ? 'calories' : 'percent',

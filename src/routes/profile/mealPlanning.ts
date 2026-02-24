@@ -9,6 +9,7 @@ export interface MealSetting {
 }
 
 interface MealPreset {
+  id?: string;
   name: string;
   time: string;
   targetValue: number;
@@ -39,20 +40,20 @@ export const IF_16_8_EATING_WINDOW_GOAL_HOURS = 8;
 
 const MEAL_PATTERN_PRESETS: Record<string, MealPreset[]> = {
   three_meals: [
-    { name: 'Breakfast', time: '08:00', targetValue: 30 },
-    { name: 'Lunch', time: '13:00', targetValue: 35 },
-    { name: 'Dinner', time: '19:00', targetValue: 35 }
+    { id: 'breakfast', name: 'Breakfast', time: '08:00', targetValue: 30 },
+    { id: 'lunch', name: 'Lunch', time: '13:00', targetValue: 35 },
+    { id: 'dinner', name: 'Dinner', time: '19:00', targetValue: 35 }
   ],
   three_plus_snacks: [
-    { name: 'Breakfast', time: '08:00', targetValue: 25 },
-    { name: 'Lunch', time: '13:00', targetValue: 35 },
-    { name: 'Snack', time: '16:00', targetValue: 10 },
-    { name: 'Dinner', time: '19:00', targetValue: 30 }
+    { id: 'breakfast', name: 'Breakfast', time: '08:00', targetValue: 25 },
+    { id: 'lunch', name: 'Lunch', time: '13:00', targetValue: 35 },
+    { id: 'snack', name: 'Snack', time: '16:00', targetValue: 10 },
+    { id: 'dinner', name: 'Dinner', time: '19:00', targetValue: 30 }
   ],
   if_16_8: [
-    { name: 'Lunch', time: '12:00', targetValue: 40 },
-    { name: 'Snack', time: '16:00', targetValue: 15 },
-    { name: 'Dinner', time: '20:00', targetValue: 45 }
+    { id: 'lunch', name: 'Lunch', time: '12:00', targetValue: 40 },
+    { id: 'snack', name: 'Snack', time: '16:00', targetValue: 15 },
+    { id: 'dinner', name: 'Dinner', time: '20:00', targetValue: 45 }
   ],
   small_frequent: [
     { name: 'Meal 1', time: '07:00', targetValue: 15 },
@@ -91,7 +92,7 @@ export const buildMealsFromPattern = (pattern: string, createId: () => string): 
   if (!preset?.length) return [];
 
   return preset.map((meal) => ({
-    id: createId(),
+    id: meal.id || createId(),
     name: meal.name,
     time: meal.time,
     targetMode: 'percent',

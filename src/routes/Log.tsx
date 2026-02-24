@@ -16,6 +16,7 @@ import RouteHeader from '../lib/components/RouteHeader';
 const SETTINGS_KEY = 'stupid_tracker_settings_v1';
 const SETTINGS_ID = 'local-settings';
 const DEFAULT_MEAL_IDS = ['breakfast', 'lunch', 'dinner', 'snack', 'supplement'] as const;
+const CANONICAL_MEAL_IDS = new Set(DEFAULT_MEAL_IDS);
 const WEIGHT_BASED_REGEX = /^(g|ml|oz)$/i;
 const FIBER_KEY_REGEX = /^fibre$|^fiber$|^dietary[_\s-]*fiber$/i;
 
@@ -255,6 +256,53 @@ function normalizeAminoKey(value: string): string {
   return value.trim().toLowerCase().replace(/[_\s-]+/g, '');
 }
 
+function canonicalMealIdFromName(name: string): string | null {
+  const normalized = normalizeKey(name);
+  if (!normalized) return null;
+  if (normalized.includes('break')) return 'breakfast';
+  if (normalized.includes('lunch')) return 'lunch';
+  if (normalized.includes('dinner') || normalized.includes('supper')) return 'dinner';
+  if (normalized.includes('snack')) return 'snack';
+  if (normalized.includes('supplement') || normalized.includes('vitamin')) return 'supplement';
+  return null;
+}
+
+function normalizeMealId(meal: { id?: string; name?: string }, index: number, usedCanonicalMealIds: Set<string>): string {
+  const rawId = normalizeKey(meal.id || '');
+  if (rawId) {
+    if (!CANONICAL_MEAL_IDS.has(rawId)) return rawId;
+    if (!usedCanonicalMealIds.has(rawId)) {
+      usedCanonicalMealIds.add(rawId);
+      return rawId;
+    }
+  }
+
+  const canonicalFromName = canonicalMealIdFromName(meal.name || '');
+  if (canonicalFromName && !usedCanonicalMealIds.has(canonicalFromName)) {
+    usedCanonicalMealIds.add(canonicalFromName);
+    return canonicalFromName;
+  }
+
+  if (index === 0 && !usedCanonicalMealIds.has('breakfast')) {
+    usedCanonicalMealIds.add('breakfast');
+    return 'breakfast';
+  }
+  if (index === 1 && !usedCanonicalMealIds.has('lunch')) {
+    usedCanonicalMealIds.add('lunch');
+    return 'lunch';
+  }
+  if (index === 2 && !usedCanonicalMealIds.has('dinner')) {
+    usedCanonicalMealIds.add('dinner');
+    return 'dinner';
+  }
+  if (index === 3 && !usedCanonicalMealIds.has('snack')) {
+    usedCanonicalMealIds.add('snack');
+    return 'snack';
+  }
+
+  return rawId || generateId();
+}
+
 function normalizeServingUnitLabel(value: unknown): string {
   const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
   if (!normalized) return 'gram';
@@ -374,10 +422,12 @@ function parseTrackerSettings(raw: unknown): TrackerSettings | null {
       return null;
     }
 
+    const usedCanonicalMealIds = new Set<string>();
+
     const meals = Array.isArray(parsed.meals)
       ? parsed.meals
-          .map((meal) => {
-            const id = typeof meal?.id === 'string' ? meal.id.trim() : '';
+          .map((meal, index) => {
+            const id = normalizeMealId({ id: typeof meal?.id === 'string' ? meal.id : '', name: typeof meal?.name === 'string' ? meal.name : '' }, index, usedCanonicalMealIds);
             if (!id) return null;
 
             const name = typeof meal?.name === 'string' && meal.name.trim() ? meal.name.trim() : titleize(id);

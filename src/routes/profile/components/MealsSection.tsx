@@ -146,7 +146,14 @@ function MealRow({
     <div className="bg-surface border border-border-subtle rounded-xl p-2.5">
       <div className="grid grid-cols-[minmax(0,1fr)_72px_72px_84px] items-center gap-2">
         <div className="min-w-0 flex items-center justify-between gap-2">
-          <span className="text-sm font-bold text-text-main truncate">{meal.name || 'Meal'}</span>
+          <input
+            type="text"
+            value={meal.name}
+            onChange={(e) => onUpdateMeal(meal.id, { name: e.target.value })}
+            className="w-full p-1.5 rounded-lg border border-border-subtle bg-card text-text-main text-xs"
+            aria-label="Meal name"
+            placeholder="Meal"
+          />
           <button
             type="button"
             onClick={() => onRemoveMeal(meal.id)}
